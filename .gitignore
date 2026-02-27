@@ -46,3 +46,7 @@ logs/
 
 # Docker
 .docker/
+
+#asociaciones_estrategicas ejemplo de arquitectura
+src/asociaciones_estrategicas
+travelhub_docs_apoyo
