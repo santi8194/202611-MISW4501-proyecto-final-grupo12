@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Any
 from Booking.seedwork.dominio.entidades import Entidad
 
 class Repositorio(ABC):
@@ -21,4 +21,17 @@ class Repositorio(ABC):
 
     @abstractmethod
     def obtener_todos(self) -> List[Entidad]:
+        ...
+
+class Mapeador(ABC):
+    @abstractmethod
+    def obtener_tipo(self) -> type:
+        ...
+
+    @abstractmethod
+    def entidad_a_dto(self, entidad: Entidad) -> Any:
+        ...
+
+    @abstractmethod
+    def dto_a_entidad(self, dto: Any) -> Entidad:
         ...

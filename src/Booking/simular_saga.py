@@ -56,50 +56,55 @@ def run_simulation(happy_path=True):
 
         # Poblar pasos (Routing Slip)
         pasos = [
+            # PASO 1: Cobrar al cliente
             SagaStepsDefinitionDTO(
-                orden=1, 
+                index=1, 
                 id_flujo="RESERVA_ESTANDAR", 
                 version=1, 
-                paso_actual="ReservaPendiente", 
-                comando_a_emitir="ProcesarPagoCmd", 
+                comando="ProcesarPagoCmd", 
+                evento="PagoExitosoEvt", 
                 error="PagoRechazadoEvt", 
-                paso_compensacion="CancelarReservaLocalCmd"
+                compensacion="ReversarPagoCmd"
             ),
+            # PASO 2: Confirmar disponibilidad con el Hotel (MS de PMS)
             SagaStepsDefinitionDTO(
-                orden=2, 
+                index=2, 
                 id_flujo="RESERVA_ESTANDAR", 
                 version=1, 
-                paso_actual="PagoExitosoEvt", 
-                comando_a_emitir="ConfirmarReservaPmsCmd", 
+                comando="ConfirmarReservaPmsCmd", 
+                evento="ConfirmacionPmsExitosaEvt", 
                 error="ReservaRechazadaPmsEvt", 
-                paso_compensacion="ReversarPagoCmd"
+                compensacion="CancelarReservaPmsCmd"
             ),
+            # PASO 3: Aprobación manual del Backoffice o Admin
             SagaStepsDefinitionDTO(
-                orden=3, 
+                index=3, 
                 id_flujo="RESERVA_ESTANDAR", 
                 version=1, 
-                paso_actual="ConfirmacionPmsExitosaEvt", 
-                comando_a_emitir="Pausar_EsperarRevisionHotel", 
-                error="RechazarReservaManualCmd", 
-                paso_compensacion="CancelarReservaPmsCmd"
+                comando="SolicitarAprobacionManualCmd", 
+                evento="ReservaAprobadaManualEvt", 
+                error="ReservaRechazadaManualEvt", 
+                compensacion=None
             ),
+            # PASO 4: Confirmación definitiva local (Sincroniza la BD de Reservas)
             SagaStepsDefinitionDTO(
-                orden=4, 
+                index=4, 
                 id_flujo="RESERVA_ESTANDAR", 
                 version=1, 
-                paso_actual="ConfirmarReservaManualCmd", 
-                comando_a_emitir="ConfirmarReservaLocalCmd", 
+                comando="ConfirmarReservaLocalCmd", 
+                evento="ReservaConfirmadaLocalEvt", 
                 error="FallaActualizacionLocalEvt", 
-                paso_compensacion=None
+                compensacion="CancelarReservaLocalCmd"
             ),
+            # PASO 5: Cierre por Coreografía (El Notificador hace su trabajo)
             SagaStepsDefinitionDTO(
-                orden=5, 
+                index=5, 
                 id_flujo="RESERVA_ESTANDAR", 
                 version=1, 
-                paso_actual="VoucherEnviadoEvt", 
-                comando_a_emitir="MarcarSagaCompletada", 
-                error=None, 
-                paso_compensacion=None
+                comando="MarcarSagaEsperandoVoucher", # Marcador interno del ORQ
+                evento="VoucherEnviadoEvt", 
+                error="FalloEnvioVoucherEvt", 
+                compensacion="NotificarFalloTecnicoCmd"
             )
         ]
         db.session.add_all(pasos)

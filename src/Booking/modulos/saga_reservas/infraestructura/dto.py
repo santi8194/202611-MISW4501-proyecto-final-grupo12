@@ -12,13 +12,14 @@ class SagaStepsDefinitionDTO(db.Model):
     __tablename__ = "saga_steps_definitions"
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    orden = db.Column(db.Integer, nullable=False)
     id_flujo = db.Column(db.String(50), nullable=False)
     version = db.Column(db.Integer, nullable=False)
-    paso_actual = db.Column(db.String(100), nullable=False)
-    comando_a_emitir = db.Column(db.String(100), nullable=False)
+
+    index = db.Column(db.Integer, nullable=False)
+    comando = db.Column(db.String(100), nullable=True)
+    evento = db.Column(db.String(100), nullable=True)
     error = db.Column(db.String(100), nullable=True)
-    paso_compensacion = db.Column(db.String(100), nullable=True)
+    compensacion = db.Column(db.String(100), nullable=True)
 
     __table_args__ = (
         db.ForeignKeyConstraint(

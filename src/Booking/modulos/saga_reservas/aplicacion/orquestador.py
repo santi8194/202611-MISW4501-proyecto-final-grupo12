@@ -25,14 +25,21 @@ class OrquestadorSagaReservas:
     def _obtener_paso_actual(self, id_flujo: str, version: int, evento_disparador: str):
         pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
         for p in pasos:
-            if p.paso_actual == evento_disparador:
+            if p.evento == evento_disparador:
                 return p
         return None
 
     def _obtener_paso_por_comando_emitido(self, id_flujo: str, version: int, comando_emitido: str):
         pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
         for p in pasos:
-            if p.comando_a_emitir == comando_emitido:
+            if p.comando == comando_emitido:
+                return p
+        return None
+
+    def _obtener_paso_por_error(self, id_flujo: str, version: int, error_evento: str):
+        pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
+        for p in pasos:
+            if p.error == error_evento:
                 return p
         return None
 
@@ -51,23 +58,25 @@ class OrquestadorSagaReservas:
                 version_ejecucion=definicion.version
             )
             
-            # Buscar el paso correspondiente al inicio ("ReservaPendiente")
-            paso = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, "ReservaPendiente")
-            if not paso:
-                print(f"[Orquestador] No se encontró paso para ReservaPendiente")
+            # Buscamos el paso inicial (Index 0 del array, que corresponde a index=1 de la Saga).
+            pasos = self.repositorio.obtener_pasos_saga(saga.id_flujo, saga.version_ejecucion)
+            if not pasos or len(pasos) < 1:
+                print(f"[Orquestador] No hay pasos definidos")
                 return
+            
+            paso_inicial = pasos[0]
 
             # Registramos el evento inicial (para que en reversa se compense primero o al final)
-            saga.avanzar_paso(paso.orden, "ReservaPendiente", {"monto": monto})
+            saga.avanzar_paso(paso_inicial.index, "ReservaCreadaIntegracionEvt", {"monto": monto})
 
-            ComandoClase = DIR_COMANDOS.get(paso.comando_a_emitir)
+            ComandoClase = DIR_COMANDOS.get(paso_inicial.comando)
             if ComandoClase:
                 cmd = ComandoClase(id_reserva=id_reserva, monto=monto)
-                saga.registrar_comando_emitido(paso.comando_a_emitir, {"monto": monto})
+                saga.registrar_comando_emitido(paso_inicial.comando, {"monto": monto})
                 self.uow.agregar_eventos([cmd])
-                print(f"[Orquestador] Saga iniciada. Comando {paso.comando_a_emitir} emitido para reserva {id_reserva}")
+                print(f"[Orquestador] Saga iniciada. Comando {paso_inicial.comando} emitido para reserva {id_reserva}")
             
-            saga.paso_actual = paso.orden
+            saga.paso_actual = paso_inicial.index
             saga.estado_global = EstadoSaga.EN_PROCESO
 
             self.repositorio.agregar(saga)
@@ -84,14 +93,19 @@ class OrquestadorSagaReservas:
             if not paso:
                 return
 
-            saga.avanzar_paso(paso.orden, "PagoExitosoEvt", {"habitacion": str(id_habitacion)})
+            saga.avanzar_paso(paso.index, "PagoExitosoEvt", {"habitacion": str(id_habitacion)})
             
-            ComandoClase = DIR_COMANDOS.get(paso.comando_a_emitir)
-            if ComandoClase:
-                cmd = ComandoClase(id_reserva=id_reserva, id_habitacion=id_habitacion)
-                saga.registrar_comando_emitido(paso.comando_a_emitir, {"habitacion": str(id_habitacion)})
-                self.uow.agregar_eventos([cmd])
-                print(f"[Orquestador] Pago Exitoso. Comando {paso.comando_a_emitir} emitido para reserva {id_reserva}")
+            # Buscar el siguiente paso para saber qué comando emitir
+            pasos = self.repositorio.obtener_pasos_saga(saga.id_flujo, saga.version_ejecucion)
+            siguiente_paso = next((p for p in pasos if p.index == paso.index + 1), None)
+            
+            if siguiente_paso and siguiente_paso.comando:
+                ComandoClase = DIR_COMANDOS.get(siguiente_paso.comando)
+                if ComandoClase:
+                    cmd = ComandoClase(id_reserva=id_reserva, id_habitacion=id_habitacion)
+                    saga.registrar_comando_emitido(siguiente_paso.comando, {"habitacion": str(id_habitacion)})
+                    self.uow.agregar_eventos([cmd])
+                    print(f"[Orquestador] Pago Exitoso. Comando {siguiente_paso.comando} emitido para reserva {id_reserva}")
             
             saga.estado_global = EstadoSaga.PAUSADA_ESPERANDO_HOTEL
             
@@ -107,10 +121,13 @@ class OrquestadorSagaReservas:
             
             paso = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, "ConfirmacionPmsExitosaEvt")
             if paso:
-                saga.avanzar_paso(paso.orden, "ConfirmacionPmsExitosaEvt", {"status": "ok"})
+                saga.avanzar_paso(paso.index, "ConfirmacionPmsExitosaEvt", {"status": "ok"})
                 
+                pasos = self.repositorio.obtener_pasos_saga(saga.id_flujo, saga.version_ejecucion)
+                siguiente_paso = next((p for p in pasos if p.index == paso.index + 1), None)
+
                 # Por simplicidad marcamos completado si el comando indicado es un marcador o no está en DIR_COMANDOS
-                if paso.comando_a_emitir == "Pausar_EsperarRevisionHotel" or paso.comando_a_emitir == "MarcarSagaCompletada":
+                if siguiente_paso and (siguiente_paso.comando == "SolicitarAprobacionManualCmd" or siguiente_paso.comando == "MarcarSagaEsperandoVoucher"):
                     saga.estado_global = EstadoSaga.COMPLETADA
             else:
                 saga.estado_global = EstadoSaga.COMPLETADA
@@ -118,13 +135,6 @@ class OrquestadorSagaReservas:
             self.repositorio.actualizar(saga)
             self.uow.commit()
             print(f"[Orquestador] Saga COMPLETADA EXITOSAMENTE para reserva {id_reserva}")
-
-    def _obtener_paso_por_error(self, id_flujo: str, version: int, error_evento: str):
-        pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
-        for p in pasos:
-            if p.error == error_evento:
-                return p
-        return None
 
     def compensar_saga(self, id_reserva: uuid.UUID, evento_fallo: str):
         """El motor LIFO que revierte la transacción distribuida leyendo de los pasos parametrizados"""
@@ -140,7 +150,7 @@ class OrquestadorSagaReservas:
             # Buscar si el evento_fallo coincide con un 'error' esperado en la definición
             paso_fallido = self._obtener_paso_por_error(saga.id_flujo, saga.version_ejecucion, evento_fallo)
             if paso_fallido:
-                print(f"[Orquestador] El error '{evento_fallo}' corresponde al fallo del paso {paso_fallido.orden} detonado por ({paso_fallido.paso_actual})")
+                print(f"[Orquestador] El error '{evento_fallo}' corresponde al fallo del paso {paso_fallido.index} detonado por ({paso_fallido.evento})")
 
             # -------------------------------------------------------------
             # LIFO BASADO EN LA TABLA DE DEFINICIÓN DE EVENTOS
@@ -157,10 +167,10 @@ class OrquestadorSagaReservas:
                     paso = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, evento_recibido)
                     if paso is None:
                         continue
-                    if not paso.paso_compensacion:
+                    if not paso.compensacion:
                         continue
 
-                    ClaseCompensacion = DIR_COMANDOS.get(paso.paso_compensacion)
+                    ClaseCompensacion = DIR_COMANDOS.get(paso.compensacion)
                     if ClaseCompensacion:
                         print(f" -> LIFO Reversando: {evento_recibido} ... al emitir {ClaseCompensacion.__name__}")
                         

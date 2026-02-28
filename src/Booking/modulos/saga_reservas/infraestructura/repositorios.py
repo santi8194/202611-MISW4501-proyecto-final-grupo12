@@ -104,4 +104,4 @@ class RepositorioSagas(Repositorio):
         return db.session.query(SagaDefinitionDTO).filter_by(id_flujo=id_flujo, activo=True).first()
 
     def obtener_pasos_saga(self, id_flujo: str, version: int) -> list[SagaStepsDefinitionDTO]:
-        return db.session.query(SagaStepsDefinitionDTO).filter_by(id_flujo=id_flujo, version=version).order_by(SagaStepsDefinitionDTO.orden).all()
+        return db.session.query(SagaStepsDefinitionDTO).filter_by(id_flujo=id_flujo, version=version).order_by(SagaStepsDefinitionDTO.index).all()

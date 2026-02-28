@@ -32,13 +32,13 @@ class UnidadTrabajoHibrida(UnidadTrabajo):
             db.session.commit()
             
             # 2. Si el commit falla, lanzará una excepción y NUNCA llegaremos aquí.
-            # Si tuvo éxito, publicamos los eventos en el bus.
-            for evento in self._eventos:
-                # El routing key será el nombre de la clase del evento (ej: 'ReservaIniciada')
-                routing_key = evento.__class__.__name__
-                self._despachador.publicar_evento(evento, routing_key=routing_key)
-            
-            # Limpiamos los eventos despachados
+            for evento in self._eventos: # Assuming db_eventos should be self._eventos
+                try:
+                    # Dejamos que el despachador se encargue de mapear el Evento de Dominio a Integración
+                    self._despachador.publicar_evento(evento, 'eventos_dominio')
+                except Exception as e:
+                    print(f"Error publicando evento: {e}")
+            # Limpiamos los eventos despachados después de intentar publicarlos
             self._eventos.clear()
 
         except Exception as e:
