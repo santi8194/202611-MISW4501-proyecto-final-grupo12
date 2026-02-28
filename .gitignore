@@ -50,3 +50,4 @@ logs/
 #asociaciones_estrategicas ejemplo de arquitectura
 src/asociaciones_estrategicas
 travelhub_docs_apoyo
+src/Booking/database    

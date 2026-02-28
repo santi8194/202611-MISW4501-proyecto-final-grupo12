@@ -5,9 +5,10 @@ def create_app(config_name=None):
     app = Flask(__name__, instance_relative_config=True)
 
     # Configuración básica
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'database', 'booking.db'))
     app.config.from_mapping(
         SECRET_KEY='dev',
-        SQLALCHEMY_DATABASE_URI='sqlite:////tmp/booking.db',
+        SQLALCHEMY_DATABASE_URI=f'sqlite:///{db_path}',
         SQLALCHEMY_TRACK_MODIFICATIONS=False
     )
 

@@ -2,9 +2,11 @@ import uuid
 import sys
 import os
 
+
 # Agregamos la ruta base para que Python encuentre el paquete 'Booking'
-# Subimos un nivel desde simular_saga.py y apuntamos a src/
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
+# Subimos un nivel desde simular_saga.py (src/Booking/) y apuntamos a src/
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from Booking.api import create_app
 from Booking.config.db import db
