@@ -119,16 +119,28 @@ class OrquestadorSagaReservas:
             self.uow.commit()
             print(f"[Orquestador] Saga COMPLETADA EXITOSAMENTE para reserva {id_reserva}")
 
-    def compensar_saga(self, id_reserva: uuid.UUID, motivo_fallo: str):
+    def _obtener_paso_por_error(self, id_flujo: str, version: int, error_evento: str):
+        pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
+        for p in pasos:
+            if p.error == error_evento:
+                return p
+        return None
+
+    def compensar_saga(self, id_reserva: uuid.UUID, evento_fallo: str):
         """El motor LIFO que revierte la transacción distribuida leyendo de los pasos parametrizados"""
         with self.uow:
             saga = self.repositorio.buscar_por_reserva(str(id_reserva))
             if not saga or saga.estado_global in [EstadoSaga.COMPLETADA, EstadoSaga.COMPENSACION_EXITOSA]:
                 return
 
-            print(f"\n[ORQUESTADOR-FALLO] Iniciando compensación para reserva {id_reserva}. Motivo: {motivo_fallo}")
-            saga.iniciar_compensacion(motivo_fallo)
+            print(f"\n[ORQUESTADOR-FALLO] Iniciando compensación para reserva {id_reserva}. Evento fallo reportado: {evento_fallo}")
+            saga.iniciar_compensacion(f"Fallo reportado: {evento_fallo}")
             comandos_compensatorios = []
+            
+            # Buscar si el evento_fallo coincide con un 'error' esperado en la definición
+            paso_fallido = self._obtener_paso_por_error(saga.id_flujo, saga.version_ejecucion, evento_fallo)
+            if paso_fallido:
+                print(f"[Orquestador] El error '{evento_fallo}' corresponde al fallo del paso {paso_fallido.orden} detonado por ({paso_fallido.paso_actual})")
 
             # -------------------------------------------------------------
             # LIFO BASADO EN LA TABLA DE DEFINICIÓN DE EVENTOS
@@ -139,7 +151,7 @@ class OrquestadorSagaReservas:
                 if log.tipo_mensaje == TipoMensajeSaga.EVENTO_RECIBIDO:
                     evento_recibido = log.accion
                     
-                    if evento_recibido == "RechazarReservaCmd":
+                    if evento_recibido == evento_fallo:
                         continue
 
                     paso = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, evento_recibido)

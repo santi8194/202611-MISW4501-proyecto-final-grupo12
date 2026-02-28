@@ -56,11 +56,51 @@ def run_simulation(happy_path=True):
 
         # Poblar pasos (Routing Slip)
         pasos = [
-            SagaStepsDefinitionDTO(orden=1, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="ReservaPendiente", comando_a_emitir="ProcesarPagoCmd", paso_compensacion="CancelarReservaLocalCmd"),
-            SagaStepsDefinitionDTO(orden=2, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="PagoExitosoEvt", comando_a_emitir="ConfirmarReservaPmsCmd", paso_compensacion="ReversarPagoCmd"),
-            SagaStepsDefinitionDTO(orden=3, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="ConfirmacionPmsExitosaEvt", comando_a_emitir="Pausar_EsperarRevisionHotel", paso_compensacion="CancelarReservaPmsCmd"),
-            SagaStepsDefinitionDTO(orden=4, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="ConfirmarReservaManualCmd", comando_a_emitir="ConfirmarReservaLocalCmd", paso_compensacion=None),
-            SagaStepsDefinitionDTO(orden=5, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="VoucherEnviadoEvt", comando_a_emitir="MarcarSagaCompletada", paso_compensacion=None)
+            SagaStepsDefinitionDTO(
+                orden=1, 
+                id_flujo="RESERVA_ESTANDAR", 
+                version=1, 
+                paso_actual="ReservaPendiente", 
+                comando_a_emitir="ProcesarPagoCmd", 
+                error="PagoRechazadoEvt", 
+                paso_compensacion="CancelarReservaLocalCmd"
+            ),
+            SagaStepsDefinitionDTO(
+                orden=2, 
+                id_flujo="RESERVA_ESTANDAR", 
+                version=1, 
+                paso_actual="PagoExitosoEvt", 
+                comando_a_emitir="ConfirmarReservaPmsCmd", 
+                error="ReservaRechazadaPmsEvt", 
+                paso_compensacion="ReversarPagoCmd"
+            ),
+            SagaStepsDefinitionDTO(
+                orden=3, 
+                id_flujo="RESERVA_ESTANDAR", 
+                version=1, 
+                paso_actual="ConfirmacionPmsExitosaEvt", 
+                comando_a_emitir="Pausar_EsperarRevisionHotel", 
+                error="RechazarReservaManualCmd", 
+                paso_compensacion="CancelarReservaPmsCmd"
+            ),
+            SagaStepsDefinitionDTO(
+                orden=4, 
+                id_flujo="RESERVA_ESTANDAR", 
+                version=1, 
+                paso_actual="ConfirmarReservaManualCmd", 
+                comando_a_emitir="ConfirmarReservaLocalCmd", 
+                error="FallaActualizacionLocalEvt", 
+                paso_compensacion=None
+            ),
+            SagaStepsDefinitionDTO(
+                orden=5, 
+                id_flujo="RESERVA_ESTANDAR", 
+                version=1, 
+                paso_actual="VoucherEnviadoEvt", 
+                comando_a_emitir="MarcarSagaCompletada", 
+                error=None, 
+                paso_compensacion=None
+            )
         ]
         db.session.add_all(pasos)
         db.session.commit()

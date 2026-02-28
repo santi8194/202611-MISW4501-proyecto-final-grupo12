@@ -55,5 +55,5 @@ class CompensarSagaHandler(Handler):
         print(f"\n[COMANDO RECIBIDO] RechazarReservaCmd detectado provocando un FALLO MASIVO LIFO.")
         self.orquestador.compensar_saga(
             id_reserva=comando.id_reserva,
-            motivo_fallo="Solicitud de rechazo o fallo en pasarela externa"
+            evento_fallo="RechazarReservaManualCmd"
         )

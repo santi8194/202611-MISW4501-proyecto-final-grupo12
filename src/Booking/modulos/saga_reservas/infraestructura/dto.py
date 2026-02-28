@@ -17,6 +17,7 @@ class SagaStepsDefinitionDTO(db.Model):
     version = db.Column(db.Integer, nullable=False)
     paso_actual = db.Column(db.String(100), nullable=False)
     comando_a_emitir = db.Column(db.String(100), nullable=False)
+    error = db.Column(db.String(100), nullable=True)
     paso_compensacion = db.Column(db.String(100), nullable=True)
 
     __table_args__ = (
