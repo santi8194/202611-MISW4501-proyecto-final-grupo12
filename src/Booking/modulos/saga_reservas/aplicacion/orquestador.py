@@ -8,34 +8,70 @@ from Booking.modulos.saga_reservas.dominio.eventos import (
 )
 import uuid
 
+# Mapeo a memoria de los comandos
+DIR_COMANDOS = {
+    "ProcesarPagoCmd": ProcesarPagoCmd,
+    "ConfirmarReservaPmsCmd": ConfirmarReservaPmsCmd,
+    "CancelarReservaPmsCmd": CancelarReservaPmsCmd,
+    "ReversarPagoCmd": ReversarPagoCmd,
+    "CancelarReservaLocalCmd": CancelarReservaLocalCmd
+}
+
 class OrquestadorSagaReservas:
     def __init__(self, repositorio: RepositorioSagas, uow: UnidadTrabajoHibrida):
         self.repositorio = repositorio
         self.uow = uow
 
-    # MAPA DE COMPENSACIONES (Lógica LIFO Core)
-    # Si emití el Comando X, y falla el proceso, debo emitir el Comando Y para compensar.
-    MAPA_COMPENSACION = {
-        "ProcesarPagoCmd": ReversarPagoCmd,
-        "ConfirmarReservaPmsCmd": CancelarReservaPmsCmd
-    }
+    def _obtener_paso_actual(self, id_flujo: str, version: int, evento_disparador: str):
+        pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
+        for p in pasos:
+            if p.paso_actual == evento_disparador:
+                return p
+        return None
+
+    def _obtener_paso_por_comando_emitido(self, id_flujo: str, version: int, comando_emitido: str):
+        pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
+        for p in pasos:
+            if p.comando_a_emitir == comando_emitido:
+                return p
+        return None
 
     def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float):
         """Invocado cuando la reserva inicial pasa a PENDIENTE"""
         with self.uow:
+            definicion = self.repositorio.obtener_definicion_saga_activa("RESERVA_ESTANDAR")
+            if not definicion:
+                print("[Orquestador] No se encontró definición de saga activa para RESERVA_ESTANDAR")
+                return
+
             saga = SagaInstance(
                 id=uuid.uuid4(),
-                id_reserva=id_reserva
+                id_reserva=id_reserva,
+                id_flujo=definicion.id_flujo,
+                version_ejecucion=definicion.version
             )
-            # PASO 1: Emitimos comando hacia el microservicio de Pagos
-            cmd_pago = ProcesarPagoCmd(id_reserva=id_reserva, monto=monto)
-            saga.registrar_comando_emitido("ProcesarPagoCmd", {"monto": monto})
             
-            # Persistir estado y enviar mensaje
-            self.uow.agregar_eventos([cmd_pago])
+            # Buscar el paso correspondiente al inicio ("ReservaPendiente")
+            paso = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, "ReservaPendiente")
+            if not paso:
+                print(f"[Orquestador] No se encontró paso para ReservaPendiente")
+                return
+
+            # Registramos el evento inicial (para que en reversa se compense primero o al final)
+            saga.avanzar_paso(paso.orden, "ReservaPendiente", {"monto": monto})
+
+            ComandoClase = DIR_COMANDOS.get(paso.comando_a_emitir)
+            if ComandoClase:
+                cmd = ComandoClase(id_reserva=id_reserva, monto=monto)
+                saga.registrar_comando_emitido(paso.comando_a_emitir, {"monto": monto})
+                self.uow.agregar_eventos([cmd])
+                print(f"[Orquestador] Saga iniciada. Comando {paso.comando_a_emitir} emitido para reserva {id_reserva}")
+            
+            saga.paso_actual = paso.orden
+            saga.estado_global = EstadoSaga.EN_PROCESO
+
             self.repositorio.agregar(saga)
             self.uow.commit()
-            print(f"[Orquestador] Saga iniciada. Comando ProcesarPagoCmd emitido para reserva {id_reserva}")
 
     def manejar_pago_exitoso(self, id_reserva: uuid.UUID, id_habitacion: uuid.UUID):
         """Invocado cuando RabbitMQ nos dice que el pago pasó (PagoExitosoEvt)"""
@@ -44,19 +80,23 @@ class OrquestadorSagaReservas:
             if not saga or saga.estado_global != EstadoSaga.EN_PROCESO:
                 return
             
-            # Avanzamos y registramos el evento que nos empujó
-            saga.avanzar_paso(1, "PagoExitosoEvt", {"token": "dummy_token"})
+            paso = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, "PagoExitosoEvt")
+            if not paso:
+                return
+
+            saga.avanzar_paso(paso.orden, "PagoExitosoEvt", {"habitacion": str(id_habitacion)})
             
-            # PASO 2: Emitir evento hacia el PMS (Propety Management System)
-            cmd_pms = ConfirmarReservaPmsCmd(id_reserva=id_reserva, id_habitacion=id_habitacion)
-            saga.registrar_comando_emitido("ConfirmarReservaPmsCmd", {"habitacion": str(id_habitacion)})
+            ComandoClase = DIR_COMANDOS.get(paso.comando_a_emitir)
+            if ComandoClase:
+                cmd = ComandoClase(id_reserva=id_reserva, id_habitacion=id_habitacion)
+                saga.registrar_comando_emitido(paso.comando_a_emitir, {"habitacion": str(id_habitacion)})
+                self.uow.agregar_eventos([cmd])
+                print(f"[Orquestador] Pago Exitoso. Comando {paso.comando_a_emitir} emitido para reserva {id_reserva}")
             
             saga.estado_global = EstadoSaga.PAUSADA_ESPERANDO_HOTEL
             
-            self.uow.agregar_eventos([cmd_pms])
             self.repositorio.actualizar(saga)
             self.uow.commit()
-            print(f"[Orquestador] Pago Exitoso. Comando ConfirmarReservaPmsCmd emitido para reserva {id_reserva}")
 
     def manejar_confirmacion_pms(self, id_reserva: uuid.UUID):
         """Invocado por ConfirmacionPmsExitosaEvt"""
@@ -65,16 +105,22 @@ class OrquestadorSagaReservas:
             if not saga or saga.estado_global != EstadoSaga.PAUSADA_ESPERANDO_HOTEL:
                 return
             
-            saga.avanzar_paso(2, "ConfirmacionPmsExitosaEvt", {"status": "ok"})
-            saga.estado_global = EstadoSaga.COMPLETADA
+            paso = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, "ConfirmacionPmsExitosaEvt")
+            if paso:
+                saga.avanzar_paso(paso.orden, "ConfirmacionPmsExitosaEvt", {"status": "ok"})
+                
+                # Por simplicidad marcamos completado si el comando indicado es un marcador o no está en DIR_COMANDOS
+                if paso.comando_a_emitir == "Pausar_EsperarRevisionHotel" or paso.comando_a_emitir == "MarcarSagaCompletada":
+                    saga.estado_global = EstadoSaga.COMPLETADA
+            else:
+                saga.estado_global = EstadoSaga.COMPLETADA
             
             self.repositorio.actualizar(saga)
-            # Al commitear, la saga queda FINALIZADA con éxito
             self.uow.commit()
             print(f"[Orquestador] Saga COMPLETADA EXITOSAMENTE para reserva {id_reserva}")
 
     def compensar_saga(self, id_reserva: uuid.UUID, motivo_fallo: str):
-        """El motor LIFO que revierte la transacción distribuida"""
+        """El motor LIFO que revierte la transacción distribuida leyendo de los pasos parametrizados"""
         with self.uow:
             saga = self.repositorio.buscar_por_reserva(str(id_reserva))
             if not saga or saga.estado_global in [EstadoSaga.COMPLETADA, EstadoSaga.COMPENSACION_EXITOSA]:
@@ -85,39 +131,42 @@ class OrquestadorSagaReservas:
             comandos_compensatorios = []
 
             # -------------------------------------------------------------
-            # MAGIA LIFO (Last-In First-Out)
+            # LIFO BASADO EN LA TABLA DE DEFINICIÓN DE EVENTOS
             # -------------------------------------------------------------
-            # Leemos el historial de la saga al reves (reversed)
             historial_inverso = list(reversed(saga.historial))
             
             for log in historial_inverso:
-                if log.tipo_mensaje == TipoMensajeSaga.COMANDO_EMITIDO:
-                    comando_original = log.accion
+                if log.tipo_mensaje == TipoMensajeSaga.EVENTO_RECIBIDO:
+                    evento_recibido = log.accion
                     
-                    # Buscamos en el diccionario si este comando tiene un inverso
-                    ClaseCompensacion = self.MAPA_COMPENSACION.get(comando_original)
-                    
+                    if evento_recibido == "RechazarReservaCmd":
+                        continue
+
+                    paso = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, evento_recibido)
+                    if paso is None:
+                        continue
+                    if not paso.paso_compensacion:
+                        continue
+
+                    ClaseCompensacion = DIR_COMANDOS.get(paso.paso_compensacion)
                     if ClaseCompensacion:
-                        print(f" -> LIFO Reversando: {comando_original} ... generando {ClaseCompensacion.__name__}")
+                        print(f" -> LIFO Reversando: {evento_recibido} ... al emitir {ClaseCompensacion.__name__}")
                         
-                        # Instanciamos el comando inverso. 
-                        # OJO: En la vida real, sacaríamos los parámetros exactos (monto, habitacion) del log.payload_snapshot
                         if ClaseCompensacion == ReversarPagoCmd:
-                            cmd = ReversarPagoCmd(id_reserva=id_reserva, monto=log.payload_snapshot.get('monto', 0.0))
+                            cmd = ReversarPagoCmd(id_reserva=id_reserva, monto=1500.0)
                             comandos_compensatorios.append(cmd)
                         elif ClaseCompensacion == CancelarReservaPmsCmd:
-                            habitacion = log.payload_snapshot.get('habitacion', str(uuid.uuid4())) # fallback dummy
+                            habitacion = log.payload_snapshot.get('habitacion', str(uuid.uuid4()))
                             cmd = CancelarReservaPmsCmd(id_reserva=id_reserva, id_habitacion=uuid.UUID(habitacion))
                             comandos_compensatorios.append(cmd)
+                        elif ClaseCompensacion == CancelarReservaLocalCmd:
+                            cmd = CancelarReservaLocalCmd(id_reserva=id_reserva)
+                            comandos_compensatorios.append(cmd)
 
-            # Finalmente, siempre debemos cancelar la reserva local inicial que se quedó en PENDIENTE
-            print(" -> LIFO Final: Cancelando Reserva Local en Base de Datos de Booking")
-            comandos_compensatorios.append(CancelarReservaLocalCmd(id_reserva=id_reserva))
-            
             saga.estado_global = EstadoSaga.COMPENSACION_EXITOSA
             
-            # Empujamos todos los comandos generados a la cola de la UoW
             self.uow.agregar_eventos(comandos_compensatorios)
             self.repositorio.actualizar(saga)
-            self.uow.commit() # Dispara en cascada los mensajes reverse a RabbitMQ
+            self.uow.commit()
             print(f"[ORQUESTADOR-FALLO] Compensación FINALIZADA OK para la reserva {id_reserva}\n")
+

@@ -1,7 +1,10 @@
 from Booking.seedwork.dominio.repositorios import Repositorio
 from Booking.modulos.saga_reservas.dominio.entidades import SagaInstance, SagaExecutionLog
 from Booking.modulos.saga_reservas.dominio.objetos_valor import EstadoSaga, TipoMensajeSaga
-from Booking.modulos.saga_reservas.infraestructura.dto import SagaInstanceDTO, SagaExecutionLogDTO
+from Booking.modulos.saga_reservas.infraestructura.dto import (
+    SagaInstanceDTO, SagaExecutionLogDTO, 
+    SagaDefinitionDTO, SagaStepsDefinitionDTO
+)
 from Booking.config.db import db
 import uuid
 
@@ -96,3 +99,9 @@ class RepositorioSagas(Repositorio):
         if dto:
             return self.obtener_por_id(dto.id)
         return None
+
+    def obtener_definicion_saga_activa(self, id_flujo: str) -> SagaDefinitionDTO:
+        return db.session.query(SagaDefinitionDTO).filter_by(id_flujo=id_flujo, activo=True).first()
+
+    def obtener_pasos_saga(self, id_flujo: str, version: int) -> list[SagaStepsDefinitionDTO]:
+        return db.session.query(SagaStepsDefinitionDTO).filter_by(id_flujo=id_flujo, version=version).order_by(SagaStepsDefinitionDTO.orden).all()

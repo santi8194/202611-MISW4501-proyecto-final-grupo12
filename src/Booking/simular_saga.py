@@ -24,6 +24,10 @@ from Booking.modulos.saga_reservas.aplicacion.handlers import (
     FinalizarSagaPmsHandler, CompensarSagaHandler
 )
 
+from Booking.modulos.saga_reservas.infraestructura.dto import (
+    SagaDefinitionDTO, SagaStepsDefinitionDTO
+)
+
 # Monkey-patch para que el Despachador de RabbitMQ no intente conectarse (y falle) en esta prueba local sin BD/Broker real
 from Booking.seedwork.infraestructura.dispatchers import DespachadorRabbitMQ
 class MockDespachador:
@@ -40,6 +44,27 @@ def run_simulation(happy_path=True):
         # Limpiar BD en memoria
         db.drop_all()
         db.create_all()
+
+        # Poblar configuración de la Saga
+        definicion = SagaDefinitionDTO(
+            id_flujo="RESERVA_ESTANDAR", 
+            version=1, 
+            nombre_descriptivo="Flujo actual (Cobro -> Bloqueo PMS -> Revisión Manual)", 
+            activo=True
+        )
+        db.session.add(definicion)
+
+        # Poblar pasos (Routing Slip)
+        pasos = [
+            SagaStepsDefinitionDTO(orden=1, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="ReservaPendiente", comando_a_emitir="ProcesarPagoCmd", paso_compensacion="CancelarReservaLocalCmd"),
+            SagaStepsDefinitionDTO(orden=2, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="PagoExitosoEvt", comando_a_emitir="ConfirmarReservaPmsCmd", paso_compensacion="ReversarPagoCmd"),
+            SagaStepsDefinitionDTO(orden=3, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="ConfirmacionPmsExitosaEvt", comando_a_emitir="Pausar_EsperarRevisionHotel", paso_compensacion="CancelarReservaPmsCmd"),
+            SagaStepsDefinitionDTO(orden=4, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="ConfirmarReservaManualCmd", comando_a_emitir="ConfirmarReservaLocalCmd", paso_compensacion=None),
+            SagaStepsDefinitionDTO(orden=5, id_flujo="RESERVA_ESTANDAR", version=1, paso_actual="VoucherEnviadoEvt", comando_a_emitir="MarcarSagaCompletada", paso_compensacion=None)
+        ]
+        db.session.add_all(pasos)
+        db.session.commit()
+        print("[Simulación] Definición de Saga persitida en BD en memoria.")
         
         print("\n=======================================================")
         print(f"🚀 INICIANDO SIMULACIÓN DE LA SAGA ({'CAMINO FELIZ' if happy_path else 'FALLO Y COMPENSACIÓN'})")
