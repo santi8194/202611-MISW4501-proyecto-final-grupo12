@@ -1,9 +1,16 @@
 from Booking.seedwork.aplicacion.comandos import Handler
-from Booking.modulos.reserva.aplicacion.comandos import CrearReservaHold, FormalizarReserva
+from Booking.modulos.reserva.aplicacion.comandos import (
+    CrearReservaHold, FormalizarReserva, 
+    ConfirmarReservaLocalCmd, CancelarReservaLocalCmd
+)
 from Booking.modulos.reserva.dominio.entidades import Reserva
+from Booking.modulos.reserva.dominio.eventos import (
+    ReservaConfirmadaLocalEvt, FallaActualizacionLocalEvt
+)
 from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
 from Booking.config.uow import UnidadTrabajoHibrida
 import uuid
+from datetime import datetime
 
 class CrearReservaHoldHandler(Handler):
     def __init__(self, repositorio: RepositorioReservas, uow: UnidadTrabajoHibrida):
@@ -47,3 +54,58 @@ class FormalizarReservaHandler(Handler):
             self.uow.commit() 
             print(f"Reserva {reserva.id} formalizada (PENDIENTE) y evento despachado.")
         return True
+
+class ConfirmarReservaLocalHandler(Handler):
+    def __init__(self, repositorio: RepositorioReservas, uow: UnidadTrabajoHibrida):
+        self.repositorio = repositorio
+        self.uow = uow
+    
+    def handle(self, comando: ConfirmarReservaLocalCmd) -> ReservaConfirmadaLocalEvt:
+        with self.uow:
+            reserva: Reserva = self.repositorio.obtener_por_id(str(comando.id_reserva))
+            if not reserva:
+                raise ValueError(f"No se encontró la reserva con ID: {comando.id_reserva}")
+            
+            # Usar la lógica de dominio
+            reserva.confirmar_reserva()
+            
+            # Limpiamos los eventos genéricos y en su lugar anexamos nuestro evento de ruteo local.
+            reserva.eventos.clear() 
+            evento_local = ReservaConfirmadaLocalEvt(
+                id_reserva=reserva.id, 
+                fecha_actualizacion=datetime.now()
+            )
+            reserva.agregar_evento(evento_local)
+            
+            self.uow.agregar_eventos(reserva.eventos)
+            self.repositorio.actualizar(reserva)
+            self.uow.commit() 
+            print(f"✅ [HANDLER LOCAL] Reserva {reserva.id} CONFIRMADA localmente.")
+        return evento_local
+
+class CancelarReservaLocalHandler(Handler):
+    def __init__(self, repositorio: RepositorioReservas, uow: UnidadTrabajoHibrida):
+        self.repositorio = repositorio
+        self.uow = uow
+    
+    def handle(self, comando: CancelarReservaLocalCmd) -> FallaActualizacionLocalEvt:
+        with self.uow:
+            reserva: Reserva = self.repositorio.obtener_por_id(str(comando.id_reserva))
+            if not reserva:
+                raise ValueError(f"No se encontró la reserva con ID: {comando.id_reserva}")
+            
+            # Lógica de dominio para cancelar
+            reserva.cancelar_reserva()
+            
+            reserva.eventos.clear()
+            evento_falla = FallaActualizacionLocalEvt(
+                id_reserva=reserva.id, 
+                fecha_actualizacion=datetime.now()
+            )
+            reserva.agregar_evento(evento_falla)
+            
+            self.uow.agregar_eventos(reserva.eventos)
+            self.repositorio.actualizar(reserva)
+            self.uow.commit() 
+            print(f"❌ [HANDLER LOCAL] Reserva {reserva.id} CANCELADA localmente por compensación.")
+        return evento_falla

@@ -28,3 +28,13 @@ class ReservaConfirmada(EventoDominio):
 class ReservaCancelada(EventoDominio):
     id_reserva: uuid.UUID = None
     fecha_actualizacion: datetime = None
+
+@dataclass
+class ReservaConfirmadaLocalEvt(EventoDominio):
+    id_reserva: uuid.UUID = None
+    fecha_actualizacion: datetime = None
+
+@dataclass
+class FallaActualizacionLocalEvt(EventoDominio):
+    id_reserva: uuid.UUID = None
+    fecha_actualizacion: datetime = None

@@ -39,7 +39,34 @@ class PagoExitosoEvt(EventoDominio):
 class ConfirmacionPmsExitosaEvt(EventoDominio):
     id_reserva: uuid.UUID = None
     codigo_pms: str = None
+    
+@dataclass
+class ReservaRechazadaPmsEvt(EventoDominio):
+    id_reserva: uuid.UUID = None
+    motivo: str = None
+
+@dataclass
+class SolicitarAprobacionManualCmd(Comando):
+    id_reserva: uuid.UUID
+
+@dataclass
+class ReservaAprobadaManualEvt(EventoDominio):
+    id_reserva: uuid.UUID = None
+
+@dataclass
+class ReservaRechazadaManualEvt(EventoDominio):
+    id_reserva: uuid.UUID = None
+    motivo: str = None
 
 @dataclass
 class RechazarReservaCmd(Comando): # Detonante externo manual
     id_reserva: uuid.UUID = None
+
+@dataclass
+class MarcarSagaEsperandoVoucherCmd(Comando):
+    id_reserva: uuid.UUID = None
+
+@dataclass
+class VoucherEnviadoEvt(EventoDominio):
+    id_reserva: uuid.UUID = None
+    email: str = None

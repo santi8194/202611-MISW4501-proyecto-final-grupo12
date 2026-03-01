@@ -11,3 +11,11 @@ class CrearReservaHold(Comando):
 @dataclass
 class FormalizarReserva(Comando):
     id_reserva: uuid.UUID
+
+@dataclass
+class ConfirmarReservaLocalCmd(Comando):
+    id_reserva: uuid.UUID
+
+@dataclass
+class CancelarReservaLocalCmd(Comando):
+    id_reserva: uuid.UUID

@@ -37,19 +37,23 @@ El servicio cuenta con los siguientes endpoints principales:
 
 ## Simulación de la Saga (LIFO Engine)
 
-Se ha creado un script especializado para validar el comportamiento del orquestador y la lógica de compensación sin necesidad de levantar infraestructura externa (RabbitMQ real).
+Se ha creado un script especializado para validar el comportamiento del orquestador y la lógica de compensación sin necesidad de levantar infraestructura externa (RabbitMQ real). El script ahora soporta ejecución por parámetros para aislar los escenarios.
 
-Para ejecutar la simulación completa:
+Para ejecutar la simulación (asegúrate de estar en la carpeta `src/Booking` y con el `venv` activo):
 
 ```bash
-# Asegúrate de estar en la carpeta src/Booking y con el venv activo
-cd src/Booking
-python3 simular_saga.py
+# Para ejecutar el Camino Feliz (Éxito completo)
+python3 simular_saga.py exito
+
+# Para ejecutar el Camino de Compensación (Fallo y Rollback LIFO)
+python3 simular_saga.py fallido
 ```
 
 ### ¿Qué valida la simulación?
-1.  **Camino Feliz**: Ejecución completa de la saga desde la reserva hasta la confirmación del hotel y pago exitoso.
-2.  **Camino de Compensación (LIFO)**: Simulación de un fallo crítico donde el orquestador lee la bitácora de ejecución en orden inverso y dispara los comandos compensatorios necesarios para revertir los cambios realizados.
+1.  **Camino Feliz (`exito`)**: Ejecución completa de la saga desde la creación de la reserva en HOLD, formalización, pago exitoso, confirmación en PMS, aprobación manual y envío de voucher. Al finalizar, la base de datos muestra el estado `COMPLETADA`.
+2.  **Camino de Compensación (`fallido`)**: Simulación de un fallo en la aprobación manual (paso 3). El orquestador detecta el error y activa el motor LIFO para revertir en orden inverso: Cancela en PMS, reversa el pago y cancela la reserva local. Al finalizar, la base de datos muestra el estado `COMPENSACION_EXITOSA`.
+
+**Nota:** Cada ejecución del script limpia la base de datos en memoria para asegurar que los resultados sean atómicos y fáciles de auditar en el reporte final.
 
 ## Flujo de la Saga
 
@@ -78,13 +82,18 @@ Si ocurre un error (simulado mediante `RechazarReservaCmd`), el motor activa la 
     *   **Final**: Emite `CancelarReservaLocalCmd` para liberar la reserva en Booking.
 3.  **Cierre**: El estado de la saga queda en `COMPENSACION_EXITOSA`.
 
-### Matriz de Pasos y Compensaciones
+### Matriz de Pasos y Compensaciones (Routing Slip)
 
-| Paso | Microservicio | Comando / Acción | Evento de Éxito | Compensación LIFO |
+| Paso | Microservicio | Comando / Acción | Evento de Éxito | Recuperación (LIFO) |
 | :--- | :--- | :--- | :--- | :--- |
+| 0 | Booking (Local) | `CrearReservaLocalCmd`* | `ReservaCreadaIntegracionEvt` | `CancelarReservaLocalCmd` |
 | 1 | Pagos | `ProcesarPagoCmd` | `PagoExitosoEvt` | `ReversarPagoCmd` |
 | 2 | Hotel (PMS) | `ConfirmarReservaPmsCmd` | `ConfirmacionPmsExitosaEvt` | `CancelarReservaPmsCmd` |
-| 3 | Booking | (Finalización) | - | `CancelarReservaLocalCmd` |
+| 3 | Backoffice | `SolicitarAprobacionManualCmd` | `ReservaAprobadaManualEvt` | - |
+| 4 | Booking (Local) | `ConfirmarReservaLocalCmd` | `ReservaConfirmadaLocalEvt` | `CancelarReservaLocalCmd` |
+| 5 | Notificador | `MarcarSagaEsperandoVoucher` | `VoucherEnviadoEvt` | `NotificarFalloTecnicoCmd` |
+
+*\*El Paso 0 es inyectado virtualmente por el Orquestador al inicio para asegurar que la reserva inicial en HOLD sea cancelada si falla cualquier paso posterior.*
 
 ---
 *Este proyecto es parte del experimento para el Proyecto Integrador I - Grupo 12*

@@ -19,28 +19,36 @@ class IniciarSagaHandler(Handler):
             monto=evento.monto
         )
 
-class ContinuarSagaPagoHandler(Handler):
+class RespuestaSagaHandler(Handler):
+    """
+    Handler agnóstico que recibe cualquier evento proveniente de RabbitMQ (Pagos, PMS, etc.)
+    y se lo entrega al Orquestador para que decida el siguiente paso.
+    """
     def __init__(self, orquestador: OrquestadorSagaReservas):
         self.orquestador = orquestador
 
-    def handle(self, evento: PagoExitosoEvt):
-        print(f"\n[EVENTO RECIBIDO] PagoExitosoEvt detectado para: {evento.id_reserva}")
-        # dummy room ID since event doesn't have it in this demo payload yet
-        import uuid
-        dummy_room = uuid.uuid4() 
-        self.orquestador.manejar_pago_exitoso(
+    def handle(self, evento):
+        # En una app real, el evento hereda de una clase base p.ej EventoIntegracion con id_reserva
+        if not hasattr(evento, 'id_reserva'):
+            print("[RespuestaSagaHandler] Evento ignorado: No tiene id_reserva")
+            return
+            
+        nombre_evento = evento.__class__.__name__
+        print(f"\n[EVENTO RECIBIDO AGNOSTICO] {nombre_evento} detectado para: {evento.id_reserva}")
+        
+        # Convertimos el evento a diccionario para pasarlo como payload dinámico
+        payload = vars(evento).copy()
+        
+        # Eliminamos id_reserva y campos base del framework para no mandarlos duplicados al unpacking de comandos
+        claves_a_ignorar = ['id_reserva', 'id', 'fecha_creacion', 'correlacion_id']
+        for k in claves_a_ignorar:
+            if k in payload:
+                del payload[k]
+        
+        self.orquestador.manejar_evento_respuesta(
             id_reserva=evento.id_reserva,
-            id_habitacion=dummy_room
-        )
-
-class FinalizarSagaPmsHandler(Handler):
-    def __init__(self, orquestador: OrquestadorSagaReservas):
-        self.orquestador = orquestador
-
-    def handle(self, evento: ConfirmacionPmsExitosaEvt):
-        print(f"\n[EVENTO RECIBIDO] ConfirmacionPmsExitosaEvt detectada para: {evento.id_reserva}")
-        self.orquestador.manejar_confirmacion_pms(
-            id_reserva=evento.id_reserva
+            evento_recibido=nombre_evento,
+            payload_recibido=payload
         )
 
 class CompensarSagaHandler(Handler):
