@@ -1,32 +1,47 @@
-from modules.pms.domain.entities import Reservation
-from modules.pms.domain.repository import ReservationRepository
-from modules.pms.infrastructure.model import Base, ReservationModel
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from config.settings import DATABASE_URL
-
-engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)
-
-Base.metadata.create_all(engine)
+from sqlalchemy.orm import Session
+from .database import SessionLocal
+from .models import ReservationModel
 
 
-class ReservationRepositorySQL(ReservationRepository):
+class ReservationRepository:
 
-    def save(self, reservation: Reservation):
-        session = Session()
+    def save(self, reservation):
+
+        db: Session = SessionLocal()
 
         model = ReservationModel(
-            id=str(reservation.id),
-            booking_id=str(reservation.booking_id),
+            id=reservation.id,
+            booking_id=reservation.booking_id,
             hotel_id=reservation.hotel_id,
             room_type=reservation.room_type,
             guest_name=reservation.guest_name,
             state=reservation.state
         )
 
-        session.add(model)
-        session.commit()
-        session.close()
+        db.merge(model)
+        db.commit()
+        db.close()
 
-        return model
+
+    def obtain_by_booking(self, booking_id):
+
+        db: Session = SessionLocal()
+
+        reservation = db.query(ReservationModel)\
+            .filter(ReservationModel.booking_id == str(booking_id))\
+            .first()
+
+        db.close()
+        return reservation
+
+
+    def obtain_by_id(self, reservation_id):
+
+        db: Session = SessionLocal()
+
+        reservation = db.query(ReservationModel)\
+            .filter(ReservationModel.id == str(reservation_id))\
+            .first()
+
+        db.close()
+        return reservation

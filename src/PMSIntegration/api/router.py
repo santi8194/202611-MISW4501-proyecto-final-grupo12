@@ -1,29 +1,39 @@
-from uuid import UUID
-from modules.pms.application.services import PMSService
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/pms", tags=["PMS"])
+from modules.pms.application.commands.confirm_reservation import ConfirmReservation
+from modules.pms.application.commands.cancel_reservation import CancelReservation
 
-service = PMSService()
+router = APIRouter()
 
 
-class ReservationInput(BaseModel):
-    booking_id: UUID
+class ReservationRequest(BaseModel):
+    booking_id: str
     hotel_id: str
     room_type: str
     guest_name: str
 
 
-@router.post("/reserve")
-def create_reservation(data: ReservationInput):
-    try:
-        reservation = service.create_reservation(
-            booking_id=data.booking_id,
-            hotel_id=data.hotel_id,
-            room_type=data.room_type,
-            guest_name=data.guest_name
-        )
-        return reservation
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+class CancelRequest(BaseModel):
+    reservation_id: str
+
+
+@router.post("/confirm-reservation")
+def confirm_reservation(request: ReservationRequest):
+
+    command = ConfirmReservation()
+
+    return command.execute(
+        request.booking_id,
+        request.hotel_id,
+        request.room_type,
+        request.guest_name
+    )
+
+
+@router.post("/cancel-reservation")
+def cancel_reservation(request: CancelRequest):
+
+    command = CancelReservation()
+
+    return command.execute(request.reservation_id)

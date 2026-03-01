@@ -14,10 +14,13 @@ class Reservation:
     @staticmethod
     def create(booking_id, hotel_id, room_type, guest_name):
         return Reservation(
-            id=uuid4(),
-            booking_id=booking_id,
+            id=str(uuid4()),
+            booking_id=str(booking_id),
             hotel_id=hotel_id,
             room_type=room_type,
             guest_name=guest_name,
             state="CONFIRMED"
         )
+    
+    def cancel(self):
+        self.state = "CANCELED"

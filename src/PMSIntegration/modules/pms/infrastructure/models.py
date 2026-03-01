@@ -1,9 +1,5 @@
 from sqlalchemy import Column, String
-from sqlalchemy.dialects.sqlite import BLOB
-from sqlalchemy.orm import declarative_base
-
-Base = declarative_base()
-
+from .database import Base
 
 class ReservationModel(Base):
     __tablename__ = "reservations"
