@@ -22,13 +22,13 @@ class ProcessPayment:
 
         time.sleep(0.5)
 
-        if random.random() > 0.2:
-            payment.aprobar()
+        if amount < 1000:
+            payment.approve()
             repository.save(payment)
             event = SuccessfulPayment(payment.id, payment.reservation_id)
             event_bus.publish(event.type, event.to_dict())
         else:
-            payment.rechazar()
+            payment.reject()
             repository.save(payment)
             event = FailedPayment(payment.reservation_id, "Funds insufficient")
             event_bus.publish(event.type, event.to_dict())

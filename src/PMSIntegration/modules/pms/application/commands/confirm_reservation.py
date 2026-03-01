@@ -29,35 +29,21 @@ class ConfirmReservation:
 
         try:
 
-            if random.random() < 0.2:
+            if booking_id.endswith("5"):
                 raise Exception("NO_AVAILABILITY")
 
-            reservation = Reservation.create(
-                booking_id,
-                hotel_id,
-                room_type,
-                guest_name
-            )
+            reservation = Reservation.create( booking_id, hotel_id, room_type, guest_name)
 
             repository.save(reservation)
 
-            event = PMSReservationConfirmed(
-                reservation.id,
-                reservation.booking_id
-            )
-
+            event = PMSReservationConfirmed( reservation.id, reservation.booking_id)
             event_bus.publish(event.type, event.to_dict())
 
         except Exception as e:
-
-            event = PMSReservationFailed(
-                booking_id,
-                str(e)
-            )
-
+            event = PMSReservationFailed(booking_id, str(e))
             event_bus.publish(event.type, event.to_dict())
 
         return {
             "event_generated": event.type,
-            "reservation_id": reservation.id if 'reservation' in locals() else "No reservation created",
+            "reservation_id": reservation.id if 'reservation' in locals() else "No reservation created - " +  event.reason,
         }

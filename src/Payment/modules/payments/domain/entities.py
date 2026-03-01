@@ -10,8 +10,8 @@ class Payment:
         self.state = "PENDIENTE"
         self.created_at = datetime.utcnow()
 
-    def aprobar(self):
+    def approve(self):
         self.state = "APROBADO"
 
-    def rechazar(self):
+    def reject(self):
         self.state = "RECHAZADO"
