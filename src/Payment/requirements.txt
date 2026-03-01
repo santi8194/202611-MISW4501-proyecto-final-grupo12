@@ -4,3 +4,4 @@ pydantic
 pika
 pytest
 python-dotenv
+sqlalchemy

@@ -1,12 +1,14 @@
 import random
 import time
 
+from modules.payments.infrastructure.event_bus import EventBus
 from modules.payments.domain.entities import Payment
 from modules.payments.domain.events import SuccessfulPayment, FailedPayment
 from modules.payments.infrastructure.repository import PaymentRepository
 
 
 repository = PaymentRepository()
+event_bus = EventBus()
 
 class ProcessPayment:
 
@@ -20,16 +22,16 @@ class ProcessPayment:
 
         time.sleep(0.5)
 
-        # Simulación 80% éxito
         if random.random() > 0.2:
             payment.aprobar()
             repository.save(payment)
             event = SuccessfulPayment(payment.id, payment.reservation_id)
+            event_bus.publish(event.type, event.to_dict())
         else:
             payment.rechazar()
             repository.save(payment)
             event = FailedPayment(payment.reservation_id, "Funds insufficient")
-
+            event_bus.publish(event.type, event.to_dict())
         return {
             "payment_id": payment.id,
             "state": payment.state,
