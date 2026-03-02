@@ -1,0 +1,43 @@
+name: proyecto-final-grupo12
+
+services:
+
+  notification-api:
+    build:
+      context: ./src/Notification
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - REDIS_HOST=redis-db
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+    depends_on:
+      - redis-db
+      - rabbitmq-broker
+    networks:
+      - microservices-network
+
+  redis-db:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - microservices-network
+
+  rabbitmq-broker:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - microservices-network
+
+networks:
+  microservices-network:
+    driver: bridge
