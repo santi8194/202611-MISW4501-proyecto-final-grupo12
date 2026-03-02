@@ -11,6 +11,9 @@ services:
     environment:
       - REDIS_HOST=redis-db
       - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
     depends_on:
       - redis-db
       - rabbitmq-broker
