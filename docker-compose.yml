@@ -2,6 +2,24 @@ name: proyecto-final-grupo12
 
 services:
 
+  booking-api:
+    build:
+      context: ./src/Booking
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5000"
+    environment:
+      - REDIS_HOST=redis-db
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+    depends_on:
+      - redis-db
+      - rabbitmq-broker
+    networks:
+      - microservices-network
+
   notification-api:
     build:
       context: ./src/Notification

@@ -1,9 +1,11 @@
 import pika
 import json
+import os
 from dataclasses import asdict
 from Booking.modulos.reserva.infraestructura.mapeadores import MapeadorEventosReserva
+from Booking.seedwork.aplicacion.dispatchers import Despachador
 
-class DespachadorRabbitMQ:
+class DespachadorRabbitMQ(Despachador):
 
     def __init__(self):
         self._mapeador = MapeadorEventosReserva()
@@ -19,8 +21,10 @@ class DespachadorRabbitMQ:
 
     def _publicar_mensaje(self, payload_dict, topico, tipo_evento):
         try:
-            # Aquí deberías poner la configuración de tu RabbitMQ
-            connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+            # Obtenemos el host y port de variables de entorno
+            rabbitmq_host = os.getenv('RABBITMQ_HOST', 'localhost')
+            rabbitmq_port = int(os.getenv('RABBITMQ_PORT', 5672))
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_host, port=rabbitmq_port))
             channel = connection.channel()
             channel.exchange_declare(exchange=topico, exchange_type='fanout')
             
@@ -55,7 +59,9 @@ class DespachadorRabbitMQ:
     def publicar_comando(self, comando, routing_key: str):
         payload = json.dumps(asdict(comando), default=str)
         try:
-            connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+            rabbitmq_host = os.getenv('RABBITMQ_HOST', 'localhost')
+            rabbitmq_port = int(os.getenv('RABBITMQ_PORT', 5672))
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_host, port=rabbitmq_port))
             channel = connection.channel()
             channel.exchange_declare(exchange='comandos_saga', exchange_type='direct')
             channel.basic_publish(

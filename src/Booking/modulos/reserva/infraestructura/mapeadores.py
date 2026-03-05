@@ -27,7 +27,7 @@ class MapeadorEventosReserva(Mapeador):
         def v1(ev):
             payload = ReservaCreadaPayload(
                 id_reserva=str(ev.id_reserva),
-                id_cliente=str(ev.id_cliente),
+                id_cliente=str(ev.id_usuario),
                 estado="PENDIENTE",
                 fecha_creacion=ev.fecha_evento.isoformat() if hasattr(ev, 'fecha_evento') else datetime.datetime.now().isoformat()
             )

@@ -23,11 +23,32 @@ Este microservicio es el punto central del experimento para implementar y valida
 
 ## Ejecución del Servicio
 
-Para levantar el servicio de Flask (Booking API):
+Este microservicio se comunica con un broker de mensajería (RabbitMQ) de forma asíncrona mediante un patrón de Puertos y Adaptadores, y se expone mediante ASGI de alto rendimiento.
+
+### Opción 1: Ejecución vía Docker (Recomendada)
+
+La forma más sencilla de levantar el microservicio junto a todas sus dependencias (Redis, RabbitMQ) es usar Docker Compose desde la raíz del proyecto `TravelHub`:
 
 ```bash
-export FLASK_APP=api
-flask run --host=0.0.0.0 --port=5000
+docker compose build booking-api
+docker compose up -d
+```
+El servicio quedará expuesto en el puerto `5001` de la máquina anfitriona.
+
+### Opción 2: Ejecución Local Independiente
+
+Para levantar el servicio de Booking localmente (usando su entorno virtual):
+
+Asegúrate de configurar las variables de entorno si RabbitMQ no está en localhost:
+```bash
+export RABBITMQ_HOST=localhost
+export RABBITMQ_PORT=5672
+```
+
+Inicia el servidor usando Uvicorn (ASGI):
+
+```bash
+uvicorn Booking.asgi:app --host=0.0.0.0 --port=5000 --reload
 ```
 
 El servicio cuenta con los siguientes endpoints principales:

@@ -2,6 +2,7 @@ from typing import List
 from Booking.seedwork.aplicacion.uow import UnidadTrabajo
 from Booking.config.db import db
 from Booking.seedwork.infraestructura.dispatchers import DespachadorRabbitMQ
+from Booking.seedwork.aplicacion.dispatchers import Despachador
 
 class UnidadTrabajoHibrida(UnidadTrabajo):
     """
@@ -10,10 +11,10 @@ class UnidadTrabajoHibrida(UnidadTrabajo):
     Garantiza que los eventos solo se publiquen si la transacción en BD fue exitosa.
     """
 
-    def __init__(self):
+    def __init__(self, despachador: Despachador = None):
         self._eventos: List = []
-        # En un diseño más maduro, el despachador se inyectaría por dependencias
-        self._despachador = DespachadorRabbitMQ()
+        # Inyectamos el despachador por dependencias, usando RabbitMQ por defecto si no se provee.
+        self._despachador = despachador or DespachadorRabbitMQ()
 
     def __enter__(self):
         return self
