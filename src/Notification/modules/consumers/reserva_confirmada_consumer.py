@@ -5,35 +5,66 @@ from config.rabbitmq import create_connection
 from modules.services.email_service import send_voucher_email
 from modules.publishers.voucher_enviado_publisher import publish_voucher_enviado
 
+EVENTS_EXCHANGE = "travelhub.events.exchange"
+QUEUE_NAME = "notification.events.queue"
+ROUTING_KEY = "evt.reserva.confirmada"
+
 def callback(ch, method, properties, body):
-    print("Evento recibido")
-    print(body)
-    
-    data = json.loads(body)
-    
-    reserva_id = data.get("reservaId")
-    email = data.get("emailCliente")
+    try:
+        print("Evento recibido:", body)
 
-    send_voucher_email(email, reserva_id)
-    publish_voucher_enviado(reserva_id)
+        data = json.loads(body.decode())
 
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+        event_type = data.get("eventType")
+
+        if event_type != "ReservaConfirmadaEvt":
+            print("Evento ignorado:", event_type)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        reserva_id = data.get("reservaId")
+        email = data.get("emailCliente")
+
+        print(f"Procesando reserva {reserva_id} para {email}")
+
+        send_voucher_email(email, reserva_id)
+        publish_voucher_enviado(reserva_id)
+
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    except Exception as e:
+        print("Error procesando evento:", e)
 
 def start_consumer():
-    
+
     print("Notification service started")
-    print("Waiting for ReservaConfirmadaEvt...")
+    print("Waiting for evt.reserva.confirmada...")
 
     connection = create_connection()
     channel = connection.channel()
 
-    channel.queue_declare(
-        queue="booking.reserva.confirmada",
+    # Declarar exchange de eventos
+    channel.exchange_declare(
+        exchange=EVENTS_EXCHANGE,
+        exchange_type="topic",
         durable=True
     )
 
+    # Declarar cola del servicio
+    channel.queue_declare(
+        queue=QUEUE_NAME,
+        durable=True
+    )
+
+    # Vincular cola al exchange
+    channel.queue_bind(
+        exchange=EVENTS_EXCHANGE,
+        queue=QUEUE_NAME,
+        routing_key=ROUTING_KEY
+    )
+
     channel.basic_consume(
-        queue="booking.reserva.confirmada",
+        queue=QUEUE_NAME,
         on_message_callback=callback,
         auto_ack=False
     )
