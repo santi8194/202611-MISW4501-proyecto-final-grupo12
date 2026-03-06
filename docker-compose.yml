@@ -20,6 +20,26 @@ services:
     networks:
       - microservices-network
 
+  booking-saga-worker:
+    build:
+      context: ./src/Booking
+      dockerfile: Dockerfile
+    command: python /src/Booking/modulos/saga_reservas/infraestructura/consumidor_evt_saga.py
+    environment:
+      - REDIS_HOST=redis-db
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - PYTHONPATH=/src
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - redis-db
+      - rabbitmq-broker
+      - booking-api
+    networks:
+      - microservices-network
+
   notification-api:
     build:
       context: ./src/Notification
