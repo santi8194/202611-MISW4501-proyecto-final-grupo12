@@ -17,8 +17,19 @@ from Booking.config.uow import UnidadTrabajoHibrida
 def get_db_session():
     # Obtienemos la sesión de BD de SQLAlchemy configurada
     # Ya que corremos fuera de Flask de forma aislada
-    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'database', 'booking.db'))
-    engine = create_engine(f'sqlite:///{db_path}')
+    db_user = os.getenv('DB_USER')
+    db_password = os.getenv('DB_PASSWORD')
+    db_host = os.getenv('DB_HOST')
+    db_port = os.getenv('DB_PORT', '5432')
+    db_name = os.getenv('DB_NAME')
+
+    if all([db_user, db_password, db_host, db_name]):
+        connection_url = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+    else:
+        db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'database', 'booking.db'))
+        connection_url = f'sqlite:///{db_path}'
+        
+    engine = create_engine(connection_url)
     Session = sessionmaker(bind=engine)
     return Session()
 
