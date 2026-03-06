@@ -24,7 +24,7 @@ class CancelReservation:
             reservation.booking_id
         )
 
-        event_bus.publish(event.type, event.to_dict())
+        event_bus.publish_event(event.type, event.to_dict())
 
         return {
             "reservation_id": reservation.id,

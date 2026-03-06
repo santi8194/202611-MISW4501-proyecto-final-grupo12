@@ -1,7 +1,7 @@
 class PMSReservationConfirmed:
 
     def __init__(self, reservation_id, booking_id):
-        self.type = "ConfirmacionPmsExitosaEvt"
+        self.type = "evt.reserva.confirmada"
         self.reservation_id = reservation_id
         self.booking_id = booking_id
 
@@ -15,7 +15,7 @@ class PMSReservationConfirmed:
 class PMSReservationFailed:
 
     def __init__(self, booking_id, reason):
-        self.type = "ConfirmacionPmsFallidaEvt"
+        self.type = "evt.reserva.rechazada"
         self.booking_id = booking_id
         self.reason = reason
 
@@ -29,7 +29,7 @@ class PMSReservationFailed:
 class PMSReservationCancelled:
 
     def __init__(self, reservation_id, booking_id):
-        self.type = "ConfirmacionPmsCanceladaEvt"
+        self.type = "evt.reserva.cancelada"
         self.reservation_id = reservation_id
         self.booking_id = booking_id
 

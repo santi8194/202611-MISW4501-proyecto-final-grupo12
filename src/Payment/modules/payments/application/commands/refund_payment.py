@@ -17,7 +17,7 @@ class RefundPayment:
         payment.state = "REFUNDED"
         repository.save(payment)
         event = PaymentRefunded(payment.id, payment.reservation_id)
-        event_bus.publish(event.type, event.to_dict())
+        event_bus.publish_event(event.type, event.to_dict())
         
         return {
             "payment_id": payment.id,

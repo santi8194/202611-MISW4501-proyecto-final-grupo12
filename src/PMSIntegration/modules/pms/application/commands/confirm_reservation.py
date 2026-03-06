@@ -37,11 +37,11 @@ class ConfirmReservation:
             repository.save(reservation)
 
             event = PMSReservationConfirmed( reservation.id, reservation.booking_id)
-            event_bus.publish(event.type, event.to_dict())
+            event_bus.publish_event(event.type, event.to_dict())
 
         except Exception as e:
             event = PMSReservationFailed(booking_id, str(e))
-            event_bus.publish(event.type, event.to_dict())
+            event_bus.publish_event(event.type, event.to_dict())
 
         return {
             "event_generated": event.type,

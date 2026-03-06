@@ -18,7 +18,7 @@ class CancelRequest(BaseModel):
     reservation_id: str
 
 
-@router.post("/confirm-reservation")
+@router.post("/confirmar-reserva")
 def confirm_reservation(request: ReservationRequest):
 
     command = ConfirmReservation()
@@ -31,7 +31,7 @@ def confirm_reservation(request: ReservationRequest):
     )
 
 
-@router.post("/cancel-reservation")
+@router.post("/cancelar-reserva")
 def cancel_reservation(request: CancelRequest):
 
     command = CancelReservation()
