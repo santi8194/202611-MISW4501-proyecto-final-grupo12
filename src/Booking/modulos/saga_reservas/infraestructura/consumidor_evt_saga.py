@@ -38,49 +38,66 @@ def procesar_mensaje(ch, method, properties, body):
         mensaje = json.loads(body)
         print(f"\n[SAGA WORKER] Mensaje Recibido: {method.routing_key}")
         
-        # Validar tipo de evento esperado (por convención o por key)
-        if method.routing_key == "evt.reserva.creada":
-            
-            # Extraer payload base
-            payload = mensaje.get('data', {})
-            id_reserva = payload.get('id_reserva') or mensaje.get('id_reserva')
-            id_usuario = payload.get('id_cliente') or mensaje.get('id_usuario', str(uuid.uuid4()))
-            monto = payload.get('monto') or mensaje.get('monto', 1500.0) # Valor por defecto seguro si no viaja
-            
-            if not id_reserva:
-                 print("[SAGA WORKER] Ignorando evento: id_reserva vacío")
-                 ch.basic_ack(delivery_tag=method.delivery_tag)
-                 return
+        from Booking.api import create_app
+        print("[SAGA WORKER] Creando Flask App en memoria...", flush=True)
+        app = create_app()
+        
+        with app.app_context():
+            print("[SAGA WORKER] Entró al app context", flush=True)
+            repo_sagas = RepositorioSagas() # Usa db.session por defecto
+            uow = UnidadTrabajoHibrida()
+            print("[SAGA WORKER] UoW inicializado", flush=True)
+            orquestador = OrquestadorSagaReservas(repositorio=repo_sagas, uow=uow)
 
-            print(f"[SAGA WORKER] Iniciando Saga para reserva: {id_reserva}")
-            
-            from Booking.api import create_app
-            print("[SAGA WORKER] Creando Flask App en memoria...", flush=True)
-            app = create_app()
-            
-            with app.app_context():
-                 print("[SAGA WORKER] Entró al app context", flush=True)
-                 repo_sagas = RepositorioSagas() # Usa db.session por defecto
-                 uow = UnidadTrabajoHibrida()
-                 print("[SAGA WORKER] UoW inicializado", flush=True)
-                 
-                 orquestador = OrquestadorSagaReservas(repositorio=repo_sagas, uow=uow)
-                 print(f"[SAGA WORKER] Llamando orquestador con id_reserva: {id_reserva}", flush=True)
-                 res = orquestador.iniciar_saga(
-                     id_reserva=uuid.UUID(id_reserva),
-                     id_usuario=uuid.UUID(id_usuario),
-                     monto=float(monto)
-                 )
-                 print(f"[SAGA WORKER] Orquestador terminó con resultado: {res}", flush=True)
-                 
-        else:
-             print(f"[SAGA WORKER] Omitiendo evento no procesable: {method.routing_key}")
+            # Validar tipo de evento esperado (por convención o por key)
+            if method.routing_key == "evt.reserva.creada":
+                
+                # Extraer payload base
+                payload = mensaje.get('data', {})
+                id_reserva = payload.get('id_reserva') or mensaje.get('id_reserva')
+                id_usuario = payload.get('id_cliente') or mensaje.get('id_usuario', str(uuid.uuid4()))
+                monto = payload.get('monto') or mensaje.get('monto', 1500.0) # Valor por defecto seguro si no viaja
+                
+                if not id_reserva:
+                     print("[SAGA WORKER] Ignorando evento: id_reserva vacío")
+                     ch.basic_ack(delivery_tag=method.delivery_tag)
+                     return
+
+                print(f"[SAGA WORKER] Iniciando Saga para reserva: {id_reserva}")
+                     
+                print(f"[SAGA WORKER] Llamando orquestador con id_reserva: {id_reserva}", flush=True)
+                res = orquestador.iniciar_saga(
+                    id_reserva=uuid.UUID(str(id_reserva)),
+                    id_usuario=uuid.UUID(str(id_usuario)),
+                    monto=float(monto)
+                )
+                print(f"[SAGA WORKER] Orquestador terminó con resultado: {res}", flush=True)
+                     
+            else:
+                # Es un evento de respuesta de otro microservicio
+                payload = mensaje.get('data', {}) or mensaje
+                id_reserva = payload.get('id_reserva') or mensaje.get('id_reserva')
+                
+                if not id_reserva:
+                    print(f"[SAGA WORKER] Ignorando evento {method.routing_key}: No contiene id_reserva")
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                    return
+                    
+                evento_tipo = properties.type if properties.type else method.routing_key
+                print(f"[SAGA WORKER] Procesando evento de respuesta {evento_tipo} para reserva: {id_reserva}")
+                
+                # Pasar al orquestador
+                orquestador.manejar_evento_respuesta(
+                    id_reserva=uuid.UUID(str(id_reserva)),
+                    evento_recibido=evento_tipo,
+                    payload_recibido=payload
+                )
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
         print("[SAGA WORKER] Mensaje procesado y Acknowledge enviado.")
         
     except Exception as e:
-        print(f"[SAGA WORKER] Error procesando mensaje: {e}")
+        print(f"[SAGA WORKER] Error procesando mensaje {method.routing_key}: {e}")
         # Rechazamos el mensaje sin requeue en caso de error fatal de sintaxis
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
@@ -114,7 +131,8 @@ def iniciar_consumidor():
     
     exchange_name = 'travelhub.events.exchange'
     queue_name = 'saga_reservas.events.queue'
-    routing_key = 'evt.reserva.creada'
+    # Escuchar todos los eventos para la saga
+    routing_key = 'evt.#'
     
     # Declaramos el exchange como topic
     channel.exchange_declare(exchange=exchange_name, exchange_type='topic')

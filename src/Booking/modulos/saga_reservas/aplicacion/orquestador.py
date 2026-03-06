@@ -113,6 +113,9 @@ class OrquestadorSagaReservas:
                 if 'monto' in parametros_validos and 'monto' not in kwargs_filtrados:
                     kwargs_filtrados['monto'] = 1500.0
                         
+                if 'id_reserva' in kwargs_filtrados:
+                    del kwargs_filtrados['id_reserva']
+                    
                 cmd = ComandoClase(id_reserva=id_reserva, **kwargs_filtrados)
                 self.uow.agregar_eventos([cmd])
                 print(f"[Orquestador] Comando Externo {comando_nombre} emitido para reserva {id_reserva}")

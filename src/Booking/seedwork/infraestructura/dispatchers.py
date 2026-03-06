@@ -58,9 +58,7 @@ class DespachadorRabbitMQ(Despachador):
             elif tipo == "ConfirmarReservaPmsCmd":
                 routing_key = "cmd.pms.confirmar-reserva"
             elif tipo == "SolicitarAprobacionManualCmd":
-                routing_key = "cmd.backoffice.solicitar-aprobacion"
-            elif tipo == "MarcarSagaEsperandoVoucher":
-                routing_key = "cmd.notification.enviar-voucher"
+                routing_key = "cmd.partnermanagement.solicitar-aprobacion"
             elif tipo == "ReversarPagoCmd":
                 routing_key = "cmd.payment.reversar-pago"
             elif tipo == "CancelarReservaPmsCmd":
@@ -105,11 +103,13 @@ class DespachadorRabbitMQ(Despachador):
                 elif tipo == "ReservaRechazadaPmsEvt":
                     routing_key = "evt.pms.rechazada"
                 elif tipo == "ReservaAprobadaManualEvt":
-                    routing_key = "evt.backoffice.aprobada"
+                    routing_key = "evt.partnermanagement.aprobada"
                 elif tipo == "ReservaRechazadaManualEvt":
-                    routing_key = "evt.backoffice.rechazada"
+                    routing_key = "evt.partnermanagement.rechazada"
+                elif tipo == "ReservaConfirmadaLocalEvt":
+                    routing_key = "evt.reserva.confirmada"
                 elif tipo == "VoucherEnviadoEvt":
-                    routing_key = "evt.notification.voucher_enviado"
+                    routing_key = "evt.voucher.enviado"
                 elif tipo == "FalloEnvioVoucherEvt":
                     routing_key = "evt.notification.fallo_envio"
                 else: 
@@ -124,9 +124,7 @@ class DespachadorRabbitMQ(Despachador):
                 elif tipo == "ConfirmarReservaPmsCmd":
                     routing_key = "cmd.pms.confirmar-reserva"
                 elif tipo == "SolicitarAprobacionManualCmd":
-                    routing_key = "cmd.backoffice.solicitar-aprobacion"
-                elif tipo == "MarcarSagaEsperandoVoucher":
-                    routing_key = "cmd.notification.enviar-voucher"
+                    routing_key = "cmd.partnermanagement.solicitar-aprobacion"
                 elif tipo == "ReversarPagoCmd":
                     routing_key = "cmd.payment.reversar-pago"
                 elif tipo == "CancelarReservaPmsCmd":
