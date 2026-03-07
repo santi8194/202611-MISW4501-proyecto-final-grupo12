@@ -6,23 +6,21 @@ from modules.payments.application.commands.refund_payment import RefundPayment
 router = APIRouter()
 
 class PaymentRequest(BaseModel):
-    reservation_id: str
-    amount: float
-    currency: str
+    id_reserva: str
+    monto: float
 
 class RefundRequest(BaseModel):
-    payment_id: str
+    id_pago: str
 
 @router.post("/procesar_pago")
 def procesar_pago(request: PaymentRequest):
     command = ProcessPayment()
     return command.execute(
-        request.reservation_id,
-        request.amount,
-        request.currency
+        request.id_reserva,
+        request.monto,
     )
 
-@router.post("/reembolsar_pago")
+@router.post("/reversar_pago")
 def refund_payment(request: RefundRequest):
     command = RefundPayment()
-    return command.execute(request.payment_id)
+    return command.execute(request.id_pago)
