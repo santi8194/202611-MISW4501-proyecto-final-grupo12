@@ -2,6 +2,83 @@ name: proyecto-final-grupo12
 
 services:
 
+  booking-api:
+    build:
+      context: ./src/Booking
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5000"
+    environment:
+      - REDIS_HOST=redis-db
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - DB_USER=booking_user
+      - DB_PASSWORD=booking_password
+      - DB_HOST=booking-db
+      - DB_PORT=5432
+      - DB_NAME=booking_db
+    depends_on:
+      booking-db:
+        condition: service_healthy
+      redis-db:
+        condition: service_started
+      rabbitmq-broker:
+        condition: service_started
+    networks:
+      - microservices-network
+
+  booking-saga-worker:
+    build:
+      context: ./src/Booking
+      dockerfile: Dockerfile
+    command: python /src/Booking/modulos/saga_reservas/infraestructura/consumidor_evt_saga.py
+    environment:
+      - REDIS_HOST=redis-db
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - PYTHONPATH=/src
+      - PYTHONUNBUFFERED=1
+      - DB_USER=booking_user
+      - DB_PASSWORD=booking_password
+      - DB_HOST=booking-db
+      - DB_PORT=5432
+      - DB_NAME=booking_db
+    depends_on:
+      booking-db:
+        condition: service_healthy
+      redis-db:
+        condition: service_started
+      rabbitmq-broker:
+        condition: service_started
+      booking-api:
+        condition: service_started
+    networks:
+      - microservices-network
+
+  booking-simulator:
+    build:
+      context: ./src/Booking
+      dockerfile: Dockerfile
+    command: python /src/Booking/simulador_microservicios.py --modo exito
+    environment:
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - PYTHONPATH=/src
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      rabbitmq-broker:
+        condition: service_started
+      booking-saga-worker:
+        condition: service_started
+    networks:
+      - microservices-network
+
   notification-api:
     build:
       context: ./src/Notification
@@ -19,6 +96,24 @@ services:
       - rabbitmq-broker
     networks:
       - microservices-network
+
+  booking-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: booking_user
+      POSTGRES_PASSWORD: booking_password
+      POSTGRES_DB: booking_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - booking_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U booking_user -d booking_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis-db:
     image: redis:7-alpine
@@ -57,3 +152,6 @@ services:
 networks:
   microservices-network:
     driver: bridge
+
+volumes:
+  booking_db_data:

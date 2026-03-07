@@ -1,99 +1,109 @@
 # Microservicio de Booking - Experimento Saga
 
-Este microservicio es el punto central del experimento para implementar y validar la consistencia transaccional mediante el patrón Saga Orquestada con recuperación LIFO (Last-In First-Out).
+Este microservicio es el núcleo del experimento para validar la **consistencia transaccional distribuida** mediante el patrón **Saga Orquestada** con recuperación **LIFO** (Last-In First-Out).
 
-## Requisitos
+## 🚀 Instalación y Configuración
 
+### Requisitos
 - Python 3.12+
-- Virtualenv o Conda
+- Docker y Docker Compose
 
-## Instalación y Configuración
-
-1.  **Navegar a la carpeta y crear el entorno virtual**:
-    ```bash
-    cd src/Booking
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-
-2.  **Instalar dependencias**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-## Ejecución del Servicio
-
-Para levantar el servicio de Flask (Booking API):
-
+### Configuración del Entorno Virtual (Local)
+Si deseas ejecutar o depurar el código fuera de Docker:
 ```bash
-export FLASK_APP=api
-flask run --host=0.0.0.0 --port=5000
+cd src/Booking
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-El servicio cuenta con los siguientes endpoints principales:
-- `GET /health`: Estado de salud del servicio.
-- `POST /api/reserva`: Crear una reserva en estado `HOLD`.
-- `POST /api/reserva/<id>/formalizar`: Iniciar la SAGA de reserva.
+---
 
-## Simulación de la Saga (LIFO Engine)
+## 🛠️ Ejecución del Servicio
 
-Se ha creado un script especializado para validar el comportamiento del orquestador y la lógica de compensación sin necesidad de levantar infraestructura externa (RabbitMQ real). El script ahora soporta ejecución por parámetros para aislar los escenarios.
-
-Para ejecutar la simulación (asegúrate de estar en la carpeta `src/Booking` y con el `venv` activo):
-
+### Opción 1: Docker (Recomendada para E2E)
+Desde la raíz `TravelHub`:
 ```bash
-# Para ejecutar el Camino Feliz (Éxito completo)
-python3 simular_saga.py exito
+docker compose build booking-api booking-saga-worker
+docker compose up -d
+```
+- **API**: [http://localhost:5001](http://localhost:5001)
+- **RabbitMQ Management**: [http://localhost:15672](http://localhost:15672) (guest/guest)
 
-# Para ejecutar el Camino de Compensación (Fallo y Rollback LIFO)
+### Opción 2: Desarrollo Local (Hot-Reload)
+Para depuración rápida sin reconstruir imágenes:
+1. Asegura que RabbitMQ/Redis de Docker estén arriba.
+2. API (Terminal 1):
+   ```bash
+   export PYTHONPATH=$(pwd)/src
+   export RABBITMQ_HOST=localhost
+   uvicorn Booking.asgi:app --reload --port 5001
+   ```
+3. Saga Worker (Terminal 2):
+   ```bash
+   export PYTHONPATH=$(pwd)/src
+   export RABBITMQ_HOST=localhost
+   python src/Booking/modulos/saga_reservas/infraestructura/consumidor_evt_saga.py
+   ```
+
+---
+
+## 📡 Infraestructura de Mensajería (RabbitMQ)
+
+El sistema utiliza un diseño basado en **Exchanges de Tópico** para permitir enrutamiento dinámico.
+
+- **Exchange de Eventos**: `travelhub.events.exchange` (Topic)
+- **Exchange de Comandos**: `travelhub.commands.exchange` (Topic)
+
+### Mapeo de Enrutamiento (Routing Keys)
+| Tipo | Nombre | Routing Key |
+| :--- | :--- | :--- |
+| **Evento** | Reserva Creada | `evt.reserva.creada` |
+| **Comando**| Procesar Pago | `cmd.payment.procesar-pago` |
+| **Comando**| Confirmar Hotel | `cmd.pms.confirmar-reserva` |
+| **Evento** | Pago Exitoso | `evt.pago.exitoso` |
+
+---
+
+## 🔄 Flujo de la Saga Orquestada
+
+El orquestador utiliza un **Routing Slip** persistido en base de datos (`booking.db`) para determinar el siguiente paso.
+
+### Matriz de Pasos y Recuperación
+| Paso | Acción | Comando | Evento Esperado | Compensación (LIFO) |
+| :--- | :--- | :--- | :--- | :--- |
+| **0** | Inicio | `CrearReservaLocalCmd`* | `ReservaCreadaIntegracionEvt` | `CancelarReservaLocalCmd` |
+| **1** | Cobro | `ProcesarPagoCmd` | `PagoExitosoEvt` | `ReversarPagoCmd` |
+| **2** | Inventario | `ConfirmarReservaPmsCmd` | `ConfirmacionPmsExitosaEvt` | `CancelarReservaPmsCmd` |
+| **3** | Revisión | `SolicitarAprobacionManualCmd`| `ReservaAprobadaManualEvt` | - |
+
+*\*El Paso 0 es inyectado virtualmente para asegurar consistencia si falla el pago.*
+
+---
+
+## 🔍 Depuración y Monitoreo
+
+### Verificación de Mensajes en Cola
+Puedes inspeccionar si los comandos están llegando al broker:
+```bash
+docker exec -it proyecto-final-grupo12-rabbitmq-broker-1 rabbitmqadmin list queues
+```
+
+### Visualización de Logs
+```bash
+# Ver logs del API
+docker logs -f proyecto-final-grupo12-booking-api-1
+
+# Ver logs del Orquestador (Worker)
+docker logs -f proyecto-final-grupo12-booking-saga-worker-1
+```
+
+### Simulación Agnóstica
+Para probar la lógica del motor sin RabbitMQ:
+```bash
+python3 simular_saga.py exito
 python3 simular_saga.py fallido
 ```
 
-### ¿Qué valida la simulación?
-1.  **Camino Feliz (`exito`)**: Ejecución completa de la saga desde la creación de la reserva en HOLD, formalización, pago exitoso, confirmación en PMS, aprobación manual y envío de voucher. Al finalizar, la base de datos muestra el estado `COMPLETADA`.
-2.  **Camino de Compensación (`fallido`)**: Simulación de un fallo en la aprobación manual (paso 3). El orquestador detecta el error y activa el motor LIFO para revertir en orden inverso: Cancela en PMS, reversa el pago y cancela la reserva local. Al finalizar, la base de datos muestra el estado `COMPENSACION_EXITOSA`.
-
-**Nota:** Cada ejecución del script limpia la base de datos en memoria para asegurar que los resultados sean atómicos y fáciles de auditar en el reporte final.
-
-## Flujo de la Saga
-
-El experimento implementa una **Saga Orquestada** con el siguiente flujo de eventos y comandos:
-
-### 1. Camino Feliz (Éxito)
-
-1.  **Inicio**: Se recibe `CrearReservaHold` -> Estado `HOLD`.
-2.  **Formalización**: Se recibe `FormalizarReserva` -> Estado `PENDIENTE` -> Emisión de `ReservaPendiente`.
-3.  **Orquestación**: El Orquestador captura `ReservaPendiente`:
-    *   Registra inicio de saga.
-    *   Emite comando `ProcesarPagoCmd` a RabbitMQ.
-4.  **Pago**: Se recibe `PagoExitosoEvt`:
-    *   El Orquestador avanza el paso.
-    *   Emite comando `ConfirmarReservaPmsCmd` (Hotel).
-5.  **Confirmación**: Se recibe `ConfirmacionPmsExitosaEvt`:
-    *   La saga marca el estado como `COMPLETADA`.
-
-### 2. Camino de Compensación (Fallo LIFO)
-
-Si ocurre un error (simulado mediante `RechazarReservaCmd`), el motor activa la recuperación en reversa:
-1.  **Detección**: Se identifica el fallo.
-2.  **Reversión LIFO**: El orquestador lee el `SagaExecutionLog` de la instancia de atrás hacia adelante:
-    *   Si se emitió `ConfirmarReservaPmsCmd` -> Emite `CancelarReservaPmsCmd`.
-    *   Si se emitió `ProcesarPagoCmd` -> Emite `ReversarPagoCmd`.
-    *   **Final**: Emite `CancelarReservaLocalCmd` para liberar la reserva en Booking.
-3.  **Cierre**: El estado de la saga queda en `COMPENSACION_EXITOSA`.
-
-### Matriz de Pasos y Compensaciones (Routing Slip)
-
-| Paso | Microservicio | Comando / Acción | Evento de Éxito | Recuperación (LIFO) |
-| :--- | :--- | :--- | :--- | :--- |
-| 0 | Booking (Local) | `CrearReservaLocalCmd`* | `ReservaCreadaIntegracionEvt` | `CancelarReservaLocalCmd` |
-| 1 | Pagos | `ProcesarPagoCmd` | `PagoExitosoEvt` | `ReversarPagoCmd` |
-| 2 | Hotel (PMS) | `ConfirmarReservaPmsCmd` | `ConfirmacionPmsExitosaEvt` | `CancelarReservaPmsCmd` |
-| 3 | Backoffice | `SolicitarAprobacionManualCmd` | `ReservaAprobadaManualEvt` | - |
-| 4 | Booking (Local) | `ConfirmarReservaLocalCmd` | `ReservaConfirmadaLocalEvt` | `CancelarReservaLocalCmd` |
-| 5 | Notificador | `MarcarSagaEsperandoVoucher` | `VoucherEnviadoEvt` | `NotificarFalloTecnicoCmd` |
-
-*\*El Paso 0 es inyectado virtualmente por el Orquestador al inicio para asegurar que la reserva inicial en HOLD sea cancelada si falla cualquier paso posterior.*
-
 ---
-*Este proyecto es parte del experimento para el Proyecto Integrador I - Grupo 12*
+*Proyecto Integrador I - Grupo 12*

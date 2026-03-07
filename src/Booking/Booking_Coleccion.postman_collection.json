@@ -1,0 +1,112 @@
+{
+	"info": {
+		"_postman_id": "a918db47-f033-4f93-b6ea-ce8108cdb6ed",
+		"name": "TravelHub - Booking APIs",
+		"description": "Colección de endpoints para el microservicio de Booking, integrado con MISO y Saga.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Healthcheck",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"health"
+					]
+				},
+				"description": "Verifica que el servicio de Booking esté levantado y respondiendo."
+			},
+			"response": []
+		},
+		{
+			"name": "1. Crear Reserva (HOLD)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id_usuario\": \"{{$randomUUID}}\",\n    \"id_habitacion\": \"{{$randomUUID}}\",\n    \"monto\": 1500.00\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/reserva",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"reserva"
+					]
+				},
+				"description": "Crea una reserva temporal. Devuelve un `id_reserva` que deberás utilizar en el siguiente paso."
+			},
+			"response": []
+		},
+		{
+			"name": "2. Formalizar Reserva (Arrancar Saga)",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/reserva/:id_reserva/formalizar",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"reserva",
+						":id_reserva",
+						"formalizar"
+					],
+					"variable": [
+						{
+							"key": "id_reserva",
+							"value": "REEMPLAZA_CON_EL_ID_DE_LA_RESERVA_AQUI",
+							"description": "UUID generado en el paso 1"
+						}
+					]
+				},
+				"description": "Formaliza la reserva en estado HOLD e inicia la transacción distribuida (SAGA), publicando eventos en RabbitMQ."
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5001",
+			"type": "string"
+		}
+	]
+}
