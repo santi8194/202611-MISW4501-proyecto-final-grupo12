@@ -12,9 +12,9 @@ class ConfirmReservation:
         self.repository = repository
         self.event_bus = event_bus
 
-    def execute(self, booking_id, hotel_id, room_type, guest_name):
+    def execute(self, id_reserva, id_habitacion):
 
-        existing = self.repository.obtain_by_booking(booking_id)
+        existing = self.repository.obtain_by_booking(id_reserva)
 
         if existing:
             return {
@@ -27,14 +27,14 @@ class ConfirmReservation:
         try:
 
             # simulación de fallo
-            if booking_id.endswith("5"):
+            if id_reserva.endswith("5"):
                 raise Exception("NO_AVAILABILITY")
 
             reservation = Reservation.create(
-                booking_id,
-                hotel_id,
-                room_type,
-                guest_name
+                id_reserva,
+                id_habitacion,
+                "SUITE",
+                "User123"
             )
 
             self.repository.save(reservation)
@@ -47,7 +47,7 @@ class ConfirmReservation:
         except Exception as e:
 
             event = PMSReservationFailed(
-                booking_id,
+                id_reserva,
                 str(e)
             )
 

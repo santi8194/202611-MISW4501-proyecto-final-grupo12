@@ -10,7 +10,7 @@ class ProcessPayment:
         self.repository = repository
         self.event_bus = event_bus
 
-    def execute(self, reservation_id: str, amount: float, currency: str):
+    def execute(self, reservation_id: str, amount: float):
 
         existing_payment = self.repository.obtain_by_reservation(reservation_id)
 
@@ -20,7 +20,7 @@ class ProcessPayment:
                 "state": existing_payment.state
             }
 
-        payment = Payment(reservation_id, amount, currency)
+        payment = Payment(reservation_id, amount, "USD")
 
         # simulación de procesamiento
         time.sleep(0.5)

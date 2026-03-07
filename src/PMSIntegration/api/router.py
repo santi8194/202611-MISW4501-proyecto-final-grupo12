@@ -8,14 +8,12 @@ router = APIRouter()
 
 
 class ReservationRequest(BaseModel):
-    booking_id: str
-    hotel_id: str
-    room_type: str
-    guest_name: str
+    id_reserva: str
+    id_habitacion: str
 
 
 class CancelRequest(BaseModel):
-    reservation_id: str
+    id_reserva: str
 
 
 @router.post("/confirmar-reserva")
@@ -24,10 +22,8 @@ def confirm_reservation(request: ReservationRequest):
     command = ConfirmReservation()
 
     return command.execute(
-        request.booking_id,
-        request.hotel_id,
-        request.room_type,
-        request.guest_name
+        request.id_reserva,
+        request.id_habitacion
     )
 
 
@@ -36,4 +32,4 @@ def cancel_reservation(request: CancelRequest):
 
     command = CancelReservation()
 
-    return command.execute(request.reservation_id)
+    return command.execute(request.id_reserva)

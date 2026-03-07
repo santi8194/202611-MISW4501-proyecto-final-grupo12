@@ -8,8 +8,8 @@ class PMSReservationConfirmed:
 
     def to_dict(self):
         return {
-            "reservation_id": self.reservation_id,
-            "booking_id": self.booking_id
+            "pms_code": self.reservation_id,
+            "id_reserva": self.booking_id
         }
 
 
@@ -23,8 +23,8 @@ class PMSReservationFailed:
 
     def to_dict(self):
         return {
-            "booking_id": self.booking_id,
-            "reason": self.reason
+            "id_reserva": self.booking_id,
+            "razon": self.reason
         }
 
 
@@ -38,6 +38,6 @@ class PMSReservationCancelled:
 
     def to_dict(self):
         return {
-            "reservation_id": self.reservation_id,
-            "booking_id": self.booking_id
+            "pms_code": self.reservation_id,
+            "id_reserva": self.booking_id
         }
