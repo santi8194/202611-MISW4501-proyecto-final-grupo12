@@ -97,7 +97,7 @@ curl -X POST http://localhost:5001/api/reserva/<ID_RESERVA>/formalizar
 Dejar los contenedores corriendo para probar la saga.
 
 ```bash
-docker compose down && docker compose up --build -d
+docker compose down -v && docker compose up --build -d
 docker compose logs -f booking-saga-worker booking-simulator
 
 ```
