@@ -12,10 +12,6 @@ class EventBus:
 
     def publish_event(self, routing_key, event_type, payload):
 
-        if not ENABLE_EVENTS:
-            print(f"[DEV MODE] Event not sent: {event_type} -> {payload}")
-            return
-
         connection = pika.BlockingConnection(
             pika.ConnectionParameters(host=RABBIT_HOST)
         )
