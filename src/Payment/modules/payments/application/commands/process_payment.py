@@ -1,37 +1,49 @@
-import random
 import time
 
-from modules.payments.infrastructure.event_bus import EventBus
 from modules.payments.domain.entities import Payment
 from modules.payments.domain.events import SuccessfulPayment, FailedPayment
-from modules.payments.infrastructure.repository import PaymentRepository
 
-
-repository = PaymentRepository()
-event_bus = EventBus()
 
 class ProcessPayment:
 
+    def __init__(self, repository, event_bus):
+        self.repository = repository
+        self.event_bus = event_bus
+
     def execute(self, reservation_id: str, amount: float, currency: str):
 
-        existing_payment = repository.obtain_by_reservation(reservation_id)
+        existing_payment = self.repository.obtain_by_reservation(reservation_id)
+
         if existing_payment:
-            return {"message": "Payment already processed", "state": existing_payment.state}
+            return {
+                "message": "Payment already processed",
+                "state": existing_payment.state
+            }
 
         payment = Payment(reservation_id, amount, currency)
 
+        # simulación de procesamiento
         time.sleep(0.5)
 
         if amount < 1000:
+
             payment.approve()
-            repository.save(payment)
+            self.repository.save(payment)
+
             event = SuccessfulPayment(payment.id, payment.reservation_id)
-            event_bus.publish_event(event.type, event.to_dict())
+
         else:
+
             payment.reject()
-            repository.save(payment)
+            self.repository.save(payment)
+
             event = FailedPayment(payment.reservation_id, "Funds insufficient")
-            event_bus.publish_event(event.type, event.to_dict())
+
+        self.event_bus.publish_event(
+            event.type,
+            event.to_dict()
+        )
+
         return {
             "payment_id": payment.id,
             "state": payment.state,

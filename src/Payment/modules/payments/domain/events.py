@@ -23,7 +23,7 @@ class FailedPayment:
 
 class PaymentRefunded:
     def __init__(self, payment_id, reservation_id):
-        self.type = "evt.pago.reembolsado"
+        self.type = "evt.pago.reversado"
         self.payment_id = payment_id
         self.reservation_id = reservation_id
 

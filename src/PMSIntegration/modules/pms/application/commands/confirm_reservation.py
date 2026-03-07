@@ -1,24 +1,21 @@
-import random
 import time
 
-from modules.pms.infrastructure.repository import ReservationRepository
-from modules.pms.infrastructure.event_bus import EventBus
 from modules.pms.domain.entities import Reservation
 from modules.pms.domain.events import (
     PMSReservationConfirmed,
     PMSReservationFailed
 )
 
-
-repository = ReservationRepository()
-event_bus = EventBus()
-
-
 class ConfirmReservation:
+
+    def __init__(self, repository, event_bus):
+        self.repository = repository
+        self.event_bus = event_bus
 
     def execute(self, booking_id, hotel_id, room_type, guest_name):
 
-        existing = repository.obtain_by_booking(booking_id)
+        existing = self.repository.obtain_by_booking(booking_id)
+
         if existing:
             return {
                 "message": "Reservation already processed",
@@ -29,21 +26,38 @@ class ConfirmReservation:
 
         try:
 
+            # simulación de fallo
             if booking_id.endswith("5"):
                 raise Exception("NO_AVAILABILITY")
 
-            reservation = Reservation.create( booking_id, hotel_id, room_type, guest_name)
+            reservation = Reservation.create(
+                booking_id,
+                hotel_id,
+                room_type,
+                guest_name
+            )
 
-            repository.save(reservation)
+            self.repository.save(reservation)
 
-            event = PMSReservationConfirmed( reservation.id, reservation.booking_id)
-            event_bus.publish_event(event.type, event.to_dict())
+            event = PMSReservationConfirmed(
+                reservation.id,
+                reservation.booking_id
+            )
 
         except Exception as e:
-            event = PMSReservationFailed(booking_id, str(e))
-            event_bus.publish_event(event.type, event.to_dict())
+
+            event = PMSReservationFailed(
+                booking_id,
+                str(e)
+            )
+
+        self.event_bus.publish_event(
+            event.type,
+            event.to_dict()
+        )
 
         return {
             "event_generated": event.type,
-            "reservation_id": reservation.id if 'reservation' in locals() else "No reservation created - " +  event.reason,
+            "reservation_id": reservation.id if 'reservation' in locals()
+            else f"No reservation created - {event.reason}"
         }
