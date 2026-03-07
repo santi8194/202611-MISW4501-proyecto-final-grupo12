@@ -2,7 +2,7 @@ class PMSReservationConfirmed:
 
     def __init__(self, reservation_id, booking_id):
         self.routing_key = "evt.pms.confirmacion_exitosa"
-        self.type = "PMSReservaConfirmadaEvt"
+        self.type = "ConfirmacionPmsExitosaEvt"
         self.reservation_id = reservation_id
         self.booking_id = booking_id
 
@@ -17,7 +17,7 @@ class PMSReservationFailed:
 
     def __init__(self, booking_id, reason):
         self.routing_key = "evt.pms.confirmacion_fallida"
-        self.type = "PMSReservaFallidaEvt"
+        self.type = "ReservaRechazadaPmsEvt"
         self.booking_id = booking_id
         self.reason = reason
 
@@ -32,7 +32,7 @@ class PMSReservationCancelled:
 
     def __init__(self, reservation_id, booking_id):
         self.routing_key = "evt.pms.reserva_cancelada"
-        self.type = "PMSReservaCanceladaEvt"
+        self.type = "ConfirmacionPmsCanceladaEvt"
         self.reservation_id = reservation_id
         self.booking_id = booking_id
 

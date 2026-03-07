@@ -6,8 +6,8 @@ class SuccessfulPayment:
         self.reservation_id = reservation_id
     def to_dict(self):
         return {
-            "payment_id": self.payment_id,
-            "reservation_id": self.reservation_id
+            "id_pago": self.payment_id,
+            "id_reserva": self.reservation_id
         }
 
 class FailedPayment:
@@ -19,8 +19,8 @@ class FailedPayment:
 
     def to_dict(self):
         return {
-            "reservation_id": self.reservation_id,
-            "reason": self.reason
+            "id_reserva": self.reservation_id,
+            "razon": self.reason
         }
 
 class PaymentRefunded:
@@ -32,6 +32,6 @@ class PaymentRefunded:
 
     def to_dict(self):
         return {
-            "payment_id": self.payment_id,
-            "reservation_id": self.reservation_id
+            "id_pago": self.payment_id,
+            "id_reserva": self.reservation_id
         }

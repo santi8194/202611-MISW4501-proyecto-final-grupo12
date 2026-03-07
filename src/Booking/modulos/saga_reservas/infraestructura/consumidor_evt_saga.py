@@ -84,8 +84,9 @@ def procesar_mensaje(ch, method, properties, body):
                     print(f"[SAGA WORKER] Ignorando evento {method.routing_key}: No contiene id_reserva")
                     ch.basic_ack(delivery_tag=method.delivery_tag)
                     return
-                    
-                evento_tipo = properties.type if properties.type else method.routing_key
+                
+                data = json.loads(body.decode())
+                evento_tipo = data["type"] if "type" in data else method.routing_key
                 print(f"[SAGA WORKER] Procesando evento de respuesta {evento_tipo} para reserva: {id_reserva}")
                 
                 # Pasar al orquestador
