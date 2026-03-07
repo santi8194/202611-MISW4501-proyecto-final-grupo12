@@ -41,7 +41,7 @@ class SagaInstance(AgregacionRaiz):
         )
         self.historial.append(log)
 
-    def iniciar_compensacion(self, motivo: str):
+    def iniciar_compensacion(self, accion: str, motivo: str):
         self.estado_global = EstadoSaga.COMPENSANDO
         self.ultima_actualizacion = datetime.datetime.now()
         
@@ -49,8 +49,8 @@ class SagaInstance(AgregacionRaiz):
             id=uuid.uuid4(),
             id_instancia=self.id,
             tipo_mensaje=TipoMensajeSaga.EVENTO_RECIBIDO,
-            accion="RechazarReservaCmd",
-            payload_snapshot={"motivo": motivo}
+            accion=accion,
+            payload_snapshot={"id_reserva": str(self.id_reserva), "motivo": motivo}
         )
         self.historial.append(log)
 

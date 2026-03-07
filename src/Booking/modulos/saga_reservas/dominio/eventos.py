@@ -48,6 +48,7 @@ class ReservaRechazadaPmsEvt(EventoDominio):
 @dataclass
 class SolicitarAprobacionManualCmd(Comando):
     id_reserva: uuid.UUID
+    id_habitacion: uuid.UUID
 
 @dataclass
 class ReservaAprobadaManualEvt(EventoDominio):
