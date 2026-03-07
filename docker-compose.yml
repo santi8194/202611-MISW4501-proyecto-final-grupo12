@@ -7,7 +7,7 @@ services:
       context: ./src/Booking
       dockerfile: Dockerfile
     ports:
-      - "5001:5001"
+      - "5001:5000"
     environment:
       - REDIS_HOST=redis-db
       - RABBITMQ_HOST=rabbitmq-broker
@@ -84,7 +84,7 @@ services:
       context: ./src/Notification
       dockerfile: Dockerfile
     ports:
-      - "5002:5002"
+      - "5000:5000"
     environment:
       - REDIS_HOST=redis-db
       - RABBITMQ_HOST=rabbitmq-broker
@@ -104,7 +104,7 @@ services:
       POSTGRES_PASSWORD: booking_password
       POSTGRES_DB: booking_db
     ports:
-      - "5433:5433"
+      - "5432:5432"
     volumes:
       - booking_db_data:/var/lib/postgresql/data
     networks:
