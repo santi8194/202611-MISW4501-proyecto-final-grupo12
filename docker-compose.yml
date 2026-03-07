@@ -135,6 +135,7 @@ services:
 
 
 
+
   partnermanagement-api:
     build:
       context: ./src/PartnerManagement

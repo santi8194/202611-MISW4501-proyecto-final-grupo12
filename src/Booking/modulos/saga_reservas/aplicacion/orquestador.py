@@ -55,9 +55,9 @@ class OrquestadorSagaReservas:
         payload_registro = payload_registro or {}
 
         comando_nombre = siguiente_paso.comando
-        saga.registrar_comando_emitido(comando_nombre, payload_registro)
         
         if comando_nombre == "ConfirmarReservaLocalCmd":
+            saga.registrar_comando_emitido(comando_nombre, payload_registro)
             print(f"[Orquestador] Interceptando Comando Local: {comando_nombre}. Procesando en memoria.")
             
             from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
@@ -74,7 +74,7 @@ class OrquestadorSagaReservas:
                 print(f"✅ [ORQUESTADOR -> LOCAL] Reserva {reserva.id} CONFIRMADA localmente en BD.")
                 
                 # Avanzamos al siguiente paso informando que ya lo hicimos
-                saga.avanzar_paso(siguiente_paso.index, "ReservaConfirmadaLocalEvt", {})
+                saga.avanzar_paso(siguiente_paso.index, "ReservaConfirmadaLocalEvt", {"id_reserva": str(id_reserva)})
                 
                 # Revisar si la saga completó el happy path local e instigarlo a continuar
                 paso_final = next((p for p in pasos if p.index == siguiente_paso.index + 1), None)
@@ -107,21 +107,41 @@ class OrquestadorSagaReservas:
                         
                 # Hack temporal para la prueba de concepto y el routing slip:
                 # Si el comando requiere datos que no fluyeron nativamente en el evento anterior (ej. Pago -> PMS)
-                # los inyectamos como mock si están ausentes para no romper el DataClass strict init de Python:
+                # los inyectamos rescatándolos del contexto inicial o como mock si están ausentes:
                 if 'id_habitacion' in parametros_validos and 'id_habitacion' not in kwargs_filtrados:
-                    kwargs_filtrados['id_habitacion'] = uuid.uuid4()
+                    habitacion_ctx = None
+                    if saga.historial:
+                        habitacion_ctx = saga.historial[0].payload_snapshot.get('id_habitacion')
+                    if not habitacion_ctx:
+                        habitacion_ctx = str(uuid.uuid4())
+                    kwargs_filtrados['id_habitacion'] = uuid.UUID(str(habitacion_ctx)) if isinstance(habitacion_ctx, str) else habitacion_ctx
+                    
                 if 'monto' in parametros_validos and 'monto' not in kwargs_filtrados:
-                    kwargs_filtrados['monto'] = 1500.0
+                    # Lo mismo para monto en caso de que se haya perdido dict
+                    monto_ctx = 1500.0
+                    if saga.historial:
+                        monto_ctx = saga.historial[0].payload_snapshot.get('monto', 1500.0)
+                    kwargs_filtrados['monto'] = float(monto_ctx)
                         
+                # Registrar el comando emitido CON los parametros correctos inyectados
+                payload_final_log = kwargs_filtrados.copy()
+                payload_final_log['id_reserva'] = str(id_reserva)
+                for k, v in payload_final_log.items():
+                     if isinstance(v, uuid.UUID):
+                         payload_final_log[k] = str(v)
+                saga.registrar_comando_emitido(comando_nombre, payload_final_log)
+
                 if 'id_reserva' in kwargs_filtrados:
-                    del kwargs_filtrados['id_reserva']
+                    kwargs_filtrados.pop('id_reserva', None)
+                
+
                     
                 cmd = ComandoClase(id_reserva=id_reserva, **kwargs_filtrados)
                 self.uow.agregar_eventos([cmd])
                 print(f"[Orquestador] Comando Externo {comando_nombre} emitido para reserva {id_reserva}")
                 self.uow.commit()
 
-    def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float):
+    def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float, id_habitacion: uuid.UUID = None):
         """Invocado cuando la reserva inicial pasa a PENDIENTE"""
         try:
             with self.uow:
@@ -146,7 +166,10 @@ class OrquestadorSagaReservas:
                 paso_inicial = pasos[0]
 
                 # Registramos el evento inicial (para que en reversa se compense primero o al final)
-                saga.avanzar_paso(paso_inicial.index, "ReservaCreadaIntegracionEvt", {"monto": monto})
+                payload_inicial = {"id_reserva": str(id_reserva), "monto": monto, "id_usuario": str(id_usuario)}
+                if id_habitacion:
+                    payload_inicial["id_habitacion"] = str(id_habitacion)
+                saga.avanzar_paso(paso_inicial.index, "ReservaCreadaIntegracionEvt", payload_inicial)
 
                 # Avanzamos al paso 1 inmediatamente
                 siguiente_paso = pasos[1] if len(pasos) > 1 else None
@@ -156,8 +179,8 @@ class OrquestadorSagaReservas:
                         pasos=pasos,
                         siguiente_paso=siguiente_paso,
                         id_reserva=id_reserva,
-                        kwargs_comando={"monto": monto},
-                        payload_registro={"monto": monto}
+                        kwargs_comando=payload_inicial,
+                        payload_registro=payload_inicial
                     )
                 saga.estado_global = EstadoSaga.EN_PROCESO
 
@@ -179,6 +202,12 @@ class OrquestadorSagaReservas:
             if not saga or saga.estado_global not in [EstadoSaga.EN_PROCESO, EstadoSaga.PAUSADA_ESPERANDO_HOTEL]:
                 return
 
+            # Validar idempotencia de eventos recibidos
+            for log in saga.historial:
+                if log.tipo_mensaje == TipoMensajeSaga.EVENTO_RECIBIDO and log.accion == evento_recibido:
+                    print(f"[Orquestador Agnostico] ♻️ Evento ya procesado (Idempotencia). Ignorando: {evento_recibido}")
+                    return
+
             # Validar primero si el evento entrante es un error reportado (Fallo orgánico)
             paso_fallido = self._obtener_paso_por_error(saga.id_flujo, saga.version_ejecucion, evento_recibido)
             if paso_fallido:
@@ -193,6 +222,8 @@ class OrquestadorSagaReservas:
                 return
 
             # Marcamos que cerramos exitosamente el paso actual
+            if "id_reserva" not in payload_recibido:
+                payload_recibido["id_reserva"] = str(id_reserva)
             saga.avanzar_paso(paso_actual.index, evento_recibido, payload_recibido)
 
             # Buscar el siguiente paso configurado
@@ -224,11 +255,14 @@ class OrquestadorSagaReservas:
         """El motor LIFO que revierte la transacción distribuida leyendo de los pasos parametrizados"""
         with self.uow:
             saga = self.repositorio.buscar_por_reserva(str(id_reserva))
-            if not saga or saga.estado_global in [EstadoSaga.COMPLETADA, EstadoSaga.COMPENSACION_EXITOSA]:
+            
+            # Idempotencia: Si ya está compensando o finalizó, no hacer nada
+            if not saga or saga.estado_global in [EstadoSaga.COMPENSANDO, EstadoSaga.COMPLETADA, EstadoSaga.COMPENSACION_EXITOSA]:
+                print(f"[Orquestador-Fallo] ♻️ Compensación ya manejada o en estado final. Ignorando evento: {evento_fallo}")
                 return
 
             print(f"\n[ORQUESTADOR-FALLO] Iniciando compensación para reserva {id_reserva}. Evento fallo reportado: {evento_fallo}")
-            saga.iniciar_compensacion(f"Fallo reportado: {evento_fallo}")
+            saga.iniciar_compensacion(evento_fallo, f"Fallo reportado: {evento_fallo}")
             comandos_compensatorios = []
             
             # Buscar si el evento_fallo coincide con un 'error' esperado en la definición
@@ -258,17 +292,21 @@ class OrquestadorSagaReservas:
                     if ClaseCompensacion:
                         print(f" -> LIFO Reversando: {evento_recibido} ... al emitir {ClaseCompensacion.__name__}")
                         
-                        kwargs_log = {}
+                        kwargs_log = {"id_reserva": str(id_reserva)}
                         
                         if ClaseCompensacion == ReversarPagoCmd:
                             cmd = ReversarPagoCmd(id_reserva=id_reserva, monto=1500.0)
                             comandos_compensatorios.append(cmd)
-                            kwargs_log = {"monto": 1500.0}
+                            kwargs_log["monto"] = 1500.0
                         elif ClaseCompensacion == CancelarReservaPmsCmd:
-                            habitacion = log.payload_snapshot.get('habitacion', str(uuid.uuid4()))
-                            cmd = CancelarReservaPmsCmd(id_reserva=id_reserva, id_habitacion=uuid.UUID(habitacion))
+                            habitacion = log.payload_snapshot.get('id_habitacion')
+                            if not habitacion and saga.historial:
+                                habitacion = saga.historial[0].payload_snapshot.get('id_habitacion')
+                            if not habitacion:
+                                habitacion = str(uuid.uuid4())
+                            cmd = CancelarReservaPmsCmd(id_reserva=id_reserva, id_habitacion=uuid.UUID(str(habitacion)))
                             comandos_compensatorios.append(cmd)
-                            kwargs_log = {"id_habitacion": str(habitacion)}
+                            kwargs_log["id_habitacion"] = str(habitacion)
                         elif ClaseCompensacion == CancelarReservaLocalCmd:
                             print(f"[Orquestador-Fallo] Interceptando Comando Local para Compensación: CancelarReservaLocalCmd")
                             from Booking.modulos.reserva.aplicacion.handlers import CancelarReservaLocalHandler
@@ -289,4 +327,3 @@ class OrquestadorSagaReservas:
             self.repositorio.actualizar(saga)
             self.uow.commit()
             print(f"[ORQUESTADOR-FALLO] Compensación FINALIZADA OK para la reserva {id_reserva}\n")
-

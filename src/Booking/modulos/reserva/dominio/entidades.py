@@ -61,6 +61,7 @@ class Reserva(AgregacionRaiz):
         self.agregar_evento(ReservaPendiente(
             id_reserva=self.id,
             id_usuario=self.id_usuario,
+            id_habitacion=self.id_habitacion,
             monto=self.monto
         ))
 

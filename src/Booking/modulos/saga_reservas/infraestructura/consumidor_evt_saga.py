@@ -57,6 +57,7 @@ def procesar_mensaje(ch, method, properties, body):
                 id_reserva = payload.get('id_reserva') or mensaje.get('id_reserva')
                 id_usuario = payload.get('id_cliente') or mensaje.get('id_usuario', str(uuid.uuid4()))
                 monto = payload.get('monto') or mensaje.get('monto', 1500.0) # Valor por defecto seguro si no viaja
+                id_habitacion = payload.get('id_habitacion') or mensaje.get('id_habitacion')
                 
                 if not id_reserva:
                      print("[SAGA WORKER] Ignorando evento: id_reserva vacío")
@@ -69,7 +70,8 @@ def procesar_mensaje(ch, method, properties, body):
                 res = orquestador.iniciar_saga(
                     id_reserva=uuid.UUID(str(id_reserva)),
                     id_usuario=uuid.UUID(str(id_usuario)),
-                    monto=float(monto)
+                    monto=float(monto),
+                    id_habitacion=uuid.UUID(str(id_habitacion)) if id_habitacion else None
                 )
                 print(f"[SAGA WORKER] Orquestador terminó con resultado: {res}", flush=True)
                      

@@ -24,6 +24,7 @@ class SimuladorMicroservicios:
         self.modo = modo
         self.connection = None
         self.channel = None
+        self.habitaciones_confirmadas = set() # Simula el inventario concurrente
         
     def conectar(self):
         retries = 5
@@ -116,14 +117,32 @@ class SimuladorMicroservicios:
             # --- PMS ---
             elif routing_key == "cmd.pms.confirmar-reserva":
                 logger.info(f"Simulando Confirmar Reserva PMS para reserva {id_reserva}...")
-                self.publicar_evento(
-                    "ConfirmacionPmsExitosaEvt", 
-                    "evt.pms.confirmacion_exitosa", 
-                    {"id_reserva": id_reserva, "codigo_pms": f"HTL-{uuid.uuid4().hex[:4].upper()}"}
-                )
+                
+                # Caso 3: Idempotencia y control de concurrencia de habitación
+                id_habitacion = payload_db.get('id_habitacion')
+                if id_habitacion and id_habitacion in self.habitaciones_confirmadas:
+                    logger.warning(f"❌ PMS Rechaza: La habitación {id_habitacion} ya está confirmada por otra reserva.")
+                    self.publicar_evento(
+                        "ReservaRechazadaPmsEvt", 
+                        "evt.pms.rechazado", 
+                        {"id_reserva": id_reserva, "motivo": "Habitación sin cupo"}
+                    )
+                else:
+                    if id_habitacion:
+                        self.habitaciones_confirmadas.add(id_habitacion)
+                    
+                    self.publicar_evento(
+                        "ConfirmacionPmsExitosaEvt", 
+                        "evt.pms.confirmacion_exitosa", 
+                        {"id_reserva": id_reserva, "codigo_pms": f"HTL-{uuid.uuid4().hex[:4].upper()}"}
+                    )
                 
             elif routing_key == "cmd.pms.cancelar-reserva":
                 logger.info(f"[COMPENSACIÓN] Simulando Cancelar Reserva PMS para reserva {id_reserva}")
+                id_habitacion = payload_db.get('id_habitacion')
+                if id_habitacion and id_habitacion in self.habitaciones_confirmadas:
+                    self.habitaciones_confirmadas.remove(id_habitacion)
+                    logger.info(f"✅ PMS libera habitación {id_habitacion}")
 
             elif routing_key == "cmd.partnermanagement.solicitar-aprobacion":
                 logger.info(f"Simulando Aprobacion Manual ({self.modo}) para reserva {id_reserva}...")
