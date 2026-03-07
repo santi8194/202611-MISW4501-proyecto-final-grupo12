@@ -52,3 +52,5 @@ src/asociaciones_estrategicas
 travelhub_docs_apoyo
 src/Booking/database    
 src/aeroalpes
+src/Booking/compile_files.py
+src/Booking/contents_summary.txt

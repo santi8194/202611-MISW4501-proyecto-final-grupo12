@@ -113,48 +113,62 @@ class OrquestadorSagaReservas:
                 if 'monto' in parametros_validos and 'monto' not in kwargs_filtrados:
                     kwargs_filtrados['monto'] = 1500.0
                         
+                if 'id_reserva' in kwargs_filtrados:
+                    del kwargs_filtrados['id_reserva']
+                    
                 cmd = ComandoClase(id_reserva=id_reserva, **kwargs_filtrados)
                 self.uow.agregar_eventos([cmd])
                 print(f"[Orquestador] Comando Externo {comando_nombre} emitido para reserva {id_reserva}")
+                self.uow.commit()
 
     def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float):
         """Invocado cuando la reserva inicial pasa a PENDIENTE"""
-        with self.uow:
-            definicion = self.repositorio.obtener_definicion_saga_activa("RESERVA_ESTANDAR")
-            if not definicion:
-                print("[Orquestador] No se encontró definición de saga activa para RESERVA_ESTANDAR")
-                return
+        try:
+            with self.uow:
+                definicion = self.repositorio.obtener_definicion_saga_activa("RESERVA_ESTANDAR")
+                if not definicion:
+                    print("[Orquestador] No se encontró definición de saga activa para RESERVA_ESTANDAR")
+                    return
 
-            saga = SagaInstance(
-                id=uuid.uuid4(),
-                id_reserva=id_reserva,
-                id_flujo=definicion.id_flujo,
-                version_ejecucion=definicion.version
-            )
-            
-            # Buscamos el paso inicial (Index 0 del array, que corresponde a index=1 de la Saga).
-            pasos = self.repositorio.obtener_pasos_saga(saga.id_flujo, saga.version_ejecucion)
-            if not pasos or len(pasos) < 1:
-                print(f"[Orquestador] No hay pasos definidos")
-                return
-            
-            paso_inicial = pasos[0]
+                saga = SagaInstance(
+                    id=uuid.uuid4(),
+                    id_reserva=id_reserva,
+                    id_flujo=definicion.id_flujo,
+                    version_ejecucion=definicion.version
+                )
+                
+                # Buscamos el paso inicial (Index 0 del array, que corresponde a index=1 de la Saga).
+                pasos = self.repositorio.obtener_pasos_saga(saga.id_flujo, saga.version_ejecucion)
+                if not pasos or len(pasos) < 1:
+                    print(f"[Orquestador] No hay pasos definidos")
+                    return
+                
+                paso_inicial = pasos[0]
 
-            # Registramos el evento inicial (para que en reversa se compense primero o al final)
-            saga.avanzar_paso(paso_inicial.index, "ReservaCreadaIntegracionEvt", {"monto": monto})
+                # Registramos el evento inicial (para que en reversa se compense primero o al final)
+                saga.avanzar_paso(paso_inicial.index, "ReservaCreadaIntegracionEvt", {"monto": monto})
 
-            ComandoClase = DIR_COMANDOS.get(paso_inicial.comando)
-            if ComandoClase:
-                cmd = ComandoClase(id_reserva=id_reserva, monto=monto)
-                saga.registrar_comando_emitido(paso_inicial.comando, {"monto": monto})
-                self.uow.agregar_eventos([cmd])
-                print(f"[Orquestador] Saga iniciada. Comando {paso_inicial.comando} emitido para reserva {id_reserva}")
-            
-            saga.paso_actual = paso_inicial.index
-            saga.estado_global = EstadoSaga.EN_PROCESO
+                # Avanzamos al paso 1 inmediatamente
+                siguiente_paso = pasos[1] if len(pasos) > 1 else None
+                if siguiente_paso:
+                    self._procesar_siguiente_comando(
+                        saga=saga,
+                        pasos=pasos,
+                        siguiente_paso=siguiente_paso,
+                        id_reserva=id_reserva,
+                        kwargs_comando={"monto": monto},
+                        payload_registro={"monto": monto}
+                    )
+                saga.estado_global = EstadoSaga.EN_PROCESO
 
-            self.repositorio.agregar(saga)
-            self.uow.commit()
+                self.repositorio.agregar(saga)
+                self.uow.commit()
+                return True
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[Orquestador] Error crítico en iniciar_saga: {e}")
+            return False
 
     def manejar_evento_respuesta(self, id_reserva: uuid.UUID, evento_recibido: str, payload_recibido: dict = None):
         """Manejador agnóstico de eventos. Escucha cualquier evento de compensación o avance y determina el próximo paso consultando la DB del Routing Slip."""

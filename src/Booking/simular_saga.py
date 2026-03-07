@@ -33,91 +33,15 @@ class MockDespachador:
     def publicar_comando(self, comando, routing_key): print(f" 🐇 [MOCK RABBITMQ PUBLISH] Comando: {routing_key}")
     def cerrar(self): pass
 
-DespachadorRabbitMQ.__new__ = lambda cls: MockDespachador()
+DespachadorRabbitMQ.__new__ = lambda cls, *args, **kwargs: MockDespachador()
 # Fin de Mock
 
 def run_simulation(app, init_db=True, happy_path=True):
     with app.app_context():
         if init_db:
-            # Limpiar BD en memoria
-            db.drop_all()
-            db.create_all()
-
-            # Poblar configuración de la Saga
-            definicion = SagaDefinitionDTO(
-                id_flujo="RESERVA_ESTANDAR", 
-                version=1, 
-                nombre_descriptivo="Flujo actual (Cobro -> Bloqueo PMS -> Revisión Manual)", 
-                activo=True
-            )
-            db.session.add(definicion)
-
-            # Poblar pasos (Routing Slip)
-            pasos = [
-                # PASO 0: Creación local (Inyectado para permitir su compensación)
-                SagaStepsDefinitionDTO(
-                    index=0, 
-                    id_flujo="RESERVA_ESTANDAR", 
-                    version=1, 
-                    comando="CrearReservaLocalCmd", # Comando virtual
-                    evento="ReservaCreadaIntegracionEvt", 
-                    error="ReservaCreadaFalloEvt", 
-                    compensacion="CancelarReservaLocalCmd"
-                ),
-                # PASO 1: Cobrar al cliente
-                SagaStepsDefinitionDTO(
-                    index=1, 
-                    id_flujo="RESERVA_ESTANDAR", 
-                    version=1, 
-                    comando="ProcesarPagoCmd", 
-                    evento="PagoExitosoEvt", 
-                    error="PagoRechazadoEvt", 
-                    compensacion="ReversarPagoCmd"
-                ),
-                # PASO 2: Confirmar disponibilidad con el Hotel (MS de PMS)
-                SagaStepsDefinitionDTO(
-                    index=2, 
-                    id_flujo="RESERVA_ESTANDAR", 
-                    version=1, 
-                    comando="ConfirmarReservaPmsCmd", 
-                    evento="ConfirmacionPmsExitosaEvt", 
-                    error="ReservaRechazadaPmsEvt", 
-                    compensacion="CancelarReservaPmsCmd"
-                ),
-                # PASO 3: Aprobación manual del Backoffice o Admin
-                SagaStepsDefinitionDTO(
-                    index=3, 
-                    id_flujo="RESERVA_ESTANDAR", 
-                    version=1, 
-                    comando="SolicitarAprobacionManualCmd", 
-                    evento="ReservaAprobadaManualEvt", 
-                    error="ReservaRechazadaManualEvt", 
-                    compensacion=None
-                ),
-                # PASO 4: Confirmación definitiva local (Sincroniza la BD de Reservas)
-                SagaStepsDefinitionDTO(
-                    index=4, 
-                    id_flujo="RESERVA_ESTANDAR", 
-                    version=1, 
-                    comando="ConfirmarReservaLocalCmd", 
-                    evento="ReservaConfirmadaLocalEvt", 
-                    error="FallaActualizacionLocalEvt", 
-                    compensacion="CancelarReservaLocalCmd"
-                ),
-                # PASO 5: Cierre por Coreografía (El Notificador hace su trabajo)
-                SagaStepsDefinitionDTO(
-                    index=5, 
-                    id_flujo="RESERVA_ESTANDAR", 
-                    version=1, 
-                    comando="MarcarSagaEsperandoVoucher", # Marcador interno del ORQ
-                    evento="VoucherEnviadoEvt", 
-                    error="FalloEnvioVoucherEvt", 
-                    compensacion="NotificarFalloTecnicoCmd"
-                )
-            ]
-            db.session.add_all(pasos)
-            db.session.commit()
-            print("[Simulación] Definición de Saga persitida en BD en memoria.\n")
+            # La definición de la Saga y las tablas ya se crearon en Booking/api/__init__.py
+            # al hacer app = create_app(). Simplemente notificamos aquí.
+            print("[Simulación] Usando definición de Saga desde la inicialización de la API (Booking/api/__init__.py).\n")
         
         print("\n=======================================================")
         print(f"🚀 INICIANDO SIMULACIÓN DE LA SAGA ({'CAMINO FELIZ' if happy_path else 'FALLO Y COMPENSACIÓN'})")
