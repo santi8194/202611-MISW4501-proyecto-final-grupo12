@@ -15,7 +15,7 @@ def callback(ch, method, properties, body):
 
         data = json.loads(body.decode())
 
-        event_type = data.get("eventType")
+        event_type = data.get("type")
 
         if event_type != "ReservaConfirmadaEvt":
             print("Evento ignorado:", event_type)

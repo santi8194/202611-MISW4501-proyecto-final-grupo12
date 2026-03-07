@@ -9,7 +9,7 @@ from modules.partner.infrastructure.publishers.aprobacion_publisher import (
 # Constantes de configuración para RabbitMQ
 COMMANDS_EXCHANGE = "travelhub.commands.exchange" # Regla 1: Exchange separado para comandos (direct)
 QUEUE_NAME = "partnermanagement.commands.queue" # Regla 3: Cola con nombre específico del servicio '<servicio>.commands.queue'
-ROUTING_KEY = "cmd.partnermanagement.aprobacion-manual" # Regla 2: Llave de ruteo como 'cmd.servicio.accion'
+ROUTING_KEY = "cmd.partnermanagement.solicitar-aprobacion" # Regla 2: Llave de ruteo como 'cmd.servicio.accion'
 
 def callback(ch, method, properties, body):
     """
@@ -17,12 +17,14 @@ def callback(ch, method, properties, body):
     """
     try:
         data = json.loads(body.decode())
-        command_type = data.get("commandType", data.get("eventType", ""))
-
-        if command_type not in ["SolicitarAprobacionManualCmd", "SolicitarAprobacionManual"]:
-            print("Comando ignorado:", command_type)
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-            return
+        command_type = data.get("commandType", data.get("type", ""))
+        ##imprimir command_type 
+        print("data data:", data)
+        print("Comando ignorado:", command_type)
+        #if command_type not in ["SolicitarAprobacionManualCmd", "SolicitarAprobacionManual"]:
+        #    print("Comando ignorado:", command_type)
+        #    ch.basic_ack(delivery_tag=method.delivery_tag)
+        #    return
 
         id_reserva = data.get("id_reserva")
         if not id_reserva:

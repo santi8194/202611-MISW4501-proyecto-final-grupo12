@@ -26,7 +26,7 @@ def publish_event(routing_key: str, event_type: str, data: dict):
         )
 
         message = {
-            "eventType": event_type,
+            "type": event_type,
             **data
         }
 

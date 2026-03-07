@@ -21,7 +21,7 @@ def publish_voucher_enviado(reserva_id: str):
     )
 
     event = {
-        "eventType": "VoucherEnviadoEvt",
+        "type": "VoucherEnviadoEvt",
         "reservaId": reserva_id,
         "status": "ENVIADO"
     }

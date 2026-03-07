@@ -59,26 +59,6 @@ services:
     networks:
       - microservices-network
 
-  booking-simulator:
-    build:
-      context: ./src/Booking
-      dockerfile: Dockerfile
-    command: python /src/Booking/simulador_microservicios.py --modo exito
-    environment:
-      - RABBITMQ_HOST=rabbitmq-broker
-      - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASS=guest
-      - PYTHONPATH=/src
-      - PYTHONUNBUFFERED=1
-    depends_on:
-      rabbitmq-broker:
-        condition: service_started
-      booking-saga-worker:
-        condition: service_started
-    networks:
-      - microservices-network
-
   notification-api:
     build:
       context: ./src/Notification
@@ -104,13 +84,13 @@ services:
       POSTGRES_PASSWORD: booking_password
       POSTGRES_DB: booking_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - booking_db_data:/var/lib/postgresql/data
     networks:
       - microservices-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U booking_user -d booking_db"]
+      test: [ "CMD-SHELL", "pg_isready -U booking_user -d booking_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -132,9 +112,6 @@ services:
       - "15672:15672"
     networks:
       - microservices-network
-
-
-
 
   partnermanagement-api:
     build:
@@ -166,7 +143,7 @@ services:
       - rabbitmq-broker
     networks:
       - microservices-network
-  
+
   payments-api:
     build:
       context: ./src/Payment
