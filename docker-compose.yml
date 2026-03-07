@@ -133,6 +133,9 @@ services:
     networks:
       - microservices-network
 
+
+
+
   partnermanagement-api:
     build:
       context: ./src/PartnerManagement

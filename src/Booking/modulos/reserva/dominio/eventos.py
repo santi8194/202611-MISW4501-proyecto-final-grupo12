@@ -17,6 +17,7 @@ class ReservaIniciada(EventoDominio):
 class ReservaPendiente(EventoDominio):
     id_reserva: uuid.UUID = None
     id_usuario: uuid.UUID = None
+    id_habitacion: uuid.UUID = None
     monto: float = None
 
 @dataclass
