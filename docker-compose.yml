@@ -133,6 +133,8 @@ services:
     networks:
       - microservices-network
 
+
+
   partnermanagement-api:
     build:
       context: ./src/PartnerManagement
@@ -148,6 +150,8 @@ services:
       - rabbitmq-broker
     networks:
       - microservices-network
+
+
 
 networks:
   microservices-network:

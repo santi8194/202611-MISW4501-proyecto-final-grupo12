@@ -43,8 +43,8 @@ class SimuladorMicroservicios:
             sys.exit(1)
 
         # Declarar exchanges (normalmente infra, pero por seguridad)
-        self.channel.exchange_declare(exchange=COMMANDS_EXCHANGE, exchange_type='direct')
-        self.channel.exchange_declare(exchange=EVENTS_EXCHANGE, exchange_type='topic')
+        self.channel.exchange_declare(exchange=COMMANDS_EXCHANGE, exchange_type='direct', durable=True)
+        self.channel.exchange_declare(exchange=EVENTS_EXCHANGE, exchange_type='topic', durable=True)
         
     def configurar_consumidores(self):
         # Mapeo de Colas a Routing Keys que deben escuchar

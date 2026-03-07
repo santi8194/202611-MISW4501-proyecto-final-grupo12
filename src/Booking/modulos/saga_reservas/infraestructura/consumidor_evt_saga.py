@@ -135,7 +135,7 @@ def iniciar_consumidor():
     routing_key = 'evt.#'
     
     # Declaramos el exchange como topic
-    channel.exchange_declare(exchange=exchange_name, exchange_type='topic')
+    channel.exchange_declare(exchange=exchange_name, exchange_type='topic', durable=True)
     
     # Declaramos la cola propia del worker
     channel.queue_declare(queue=queue_name, durable=True)
