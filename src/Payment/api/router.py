@@ -13,7 +13,7 @@ class PaymentRequest(BaseModel):
 class RefundRequest(BaseModel):
     payment_id: str
 
-@router.post("/process-payment")
+@router.post("/procesar_pago")
 def procesar_pago(request: PaymentRequest):
     command = ProcessPayment()
     return command.execute(
@@ -22,7 +22,7 @@ def procesar_pago(request: PaymentRequest):
         request.currency
     )
 
-@router.post("/refund")
+@router.post("/reembolsar_pago")
 def refund_payment(request: RefundRequest):
     command = RefundPayment()
     return command.execute(request.payment_id)
