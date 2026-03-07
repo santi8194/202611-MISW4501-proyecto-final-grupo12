@@ -26,12 +26,12 @@ class ProcessPayment:
             payment.approve()
             repository.save(payment)
             event = SuccessfulPayment(payment.id, payment.reservation_id)
-            event_bus.publish(event.type, event.to_dict())
+            event_bus.publish_event(event.type, event.to_dict())
         else:
             payment.reject()
             repository.save(payment)
             event = FailedPayment(payment.reservation_id, "Funds insufficient")
-            event_bus.publish(event.type, event.to_dict())
+            event_bus.publish_event(event.type, event.to_dict())
         return {
             "payment_id": payment.id,
             "state": payment.state,
