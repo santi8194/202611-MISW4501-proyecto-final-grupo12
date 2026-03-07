@@ -10,10 +10,10 @@ EVENT_EXCHANGE = "travelhub.events.exchange"
 
 class EventBus:
 
-    def publish_event(self, routing_key, payload):
+    def publish_event(self, routing_key, event_type, payload):
 
         if not ENABLE_EVENTS:
-            print(f"[DEV MODE] Event not sent: {routing_key} -> {payload}")
+            print(f"[DEV MODE] Event not sent: {event_type} -> {payload}")
             return
 
         connection = pika.BlockingConnection(
@@ -21,6 +21,11 @@ class EventBus:
         )
 
         channel = connection.channel()
+
+        message = {
+            "eventType": event_type,
+            **payload
+        }
 
         channel.exchange_declare(
             exchange=EVENT_EXCHANGE,
@@ -31,7 +36,7 @@ class EventBus:
         channel.basic_publish(
             exchange=EVENT_EXCHANGE,
             routing_key=routing_key,
-            body=json.dumps(payload),
+            body=json.dumps(message),
             properties=pika.BasicProperties(
                 delivery_mode=2
             )

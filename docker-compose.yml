@@ -7,7 +7,7 @@ services:
       context: ./src/Booking
       dockerfile: Dockerfile
     ports:
-      - "5001:5000"
+      - "5001:5001"
     environment:
       - REDIS_HOST=redis-db
       - RABBITMQ_HOST=rabbitmq-broker
@@ -84,7 +84,7 @@ services:
       context: ./src/Notification
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "5002:5002"
     environment:
       - REDIS_HOST=redis-db
       - RABBITMQ_HOST=rabbitmq-broker
@@ -104,7 +104,7 @@ services:
       POSTGRES_PASSWORD: booking_password
       POSTGRES_DB: booking_db
     ports:
-      - "5432:5432"
+      - "5433:5433"
     volumes:
       - booking_db_data:/var/lib/postgresql/data
     networks:
@@ -155,8 +155,10 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - RABBIT_HOST=rabbitmq-broker
-      - ENABLE_EVENTS=true
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
     depends_on:
       - rabbitmq-broker
     networks:
@@ -169,8 +171,10 @@ services:
     ports:
       - "8002:8002"
     environment:
-      - RABBIT_HOST=rabbitmq-broker
-      - ENABLE_EVENTS=true
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
     depends_on:
       - rabbitmq-broker
     networks:

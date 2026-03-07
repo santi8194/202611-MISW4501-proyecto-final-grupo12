@@ -40,6 +40,7 @@ class ProcessPayment:
             event = FailedPayment(payment.reservation_id, "Funds insufficient")
 
         self.event_bus.publish_event(
+            event.routing_key,
             event.type,
             event.to_dict()
         )

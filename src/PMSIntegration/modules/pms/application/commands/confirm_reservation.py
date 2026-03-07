@@ -52,6 +52,7 @@ class ConfirmReservation:
             )
 
         self.event_bus.publish_event(
+            event.routing_key,
             event.type,
             event.to_dict()
         )
