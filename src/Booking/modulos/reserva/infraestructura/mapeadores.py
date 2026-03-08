@@ -1,7 +1,7 @@
 from Booking.seedwork.dominio.repositorios import Mapeador
 from Booking.seedwork.dominio.eventos import EventoDominio
-from Booking.modulos.reserva.dominio.eventos import ReservaPendiente
-from .schema.v1.eventos import EventoReservaCreada, ReservaCreadaPayload
+from Booking.modulos.reserva.dominio.eventos import ReservaPendiente, ReservaConfirmadaEvt
+from .schema.v1.eventos import EventoReservaCreada, ReservaCreadaPayload, EventoReservaConfirmada, ReservaConfirmadaPayload
 import datetime
 
 class MapeadorEventosReserva(Mapeador):
@@ -11,7 +11,8 @@ class MapeadorEventosReserva(Mapeador):
 
     def __init__(self):
         self.router = {
-            ReservaPendiente: self._entidad_a_reserva_creada
+            ReservaPendiente: self._entidad_a_reserva_creada,
+            ReservaConfirmadaEvt: self._entidad_a_reserva_confirmada
         }
 
     def obtener_tipo(self) -> type:
@@ -36,6 +37,27 @@ class MapeadorEventosReserva(Mapeador):
                 time=datetime.datetime.now().isoformat(),
                 specversion=str(version),
                 type='ReservaCreadaIntegracionEvt',
+                data=payload
+            )
+            return evento_integracion
+
+        if not self.es_version_valida(version):
+            raise Exception(f'No se sabe procesar la version {version}')
+
+        if version == 'v1':
+            return v1(evento)
+
+    def _entidad_a_reserva_confirmada(self, evento: ReservaConfirmadaEvt, version=LATEST_VERSION):
+        def v1(ev):
+            payload = ReservaConfirmadaPayload(
+                id_reserva=str(ev.id_reserva),
+                emailCliente="cliente-simulado@dummy.com" # TODO: Obtener email real del usuario o del contexto de la saga
+            )
+            evento_integracion = EventoReservaConfirmada(
+                id=str(ev.id),
+                time=datetime.datetime.now().isoformat(),
+                specversion=str(version),
+                type='ReservaConfirmadaEvt',
                 data=payload
             )
             return evento_integracion

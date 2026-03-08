@@ -5,9 +5,8 @@ from modules.payments.infrastructure.services.event_bus import EventBus
 
 def handle_process_payment(data):
 
-    reservation_id = data["reservation_id"]
-    amount = data["amount"]
-    currency = data["currency"]
+    reservation_id = data["id_reserva"]
+    amount = data["monto"]
 
     print(f"[PAYMENTS] Command received: ProcessPayment for reservation {reservation_id}")
 
@@ -19,7 +18,6 @@ def handle_process_payment(data):
     result = use_case.execute(
         reservation_id,
         amount,
-        currency
     )
 
     print("[PAYMENTS] Result:", result)
@@ -27,7 +25,7 @@ def handle_process_payment(data):
 
 def handle_refund_payment(data):
 
-    reservation_id = data["reservation_id"]
+    reservation_id = data["id_reserva"]
 
     print(f"[PAYMENTS] Command received: RefundPayment for reservation {reservation_id}")
 

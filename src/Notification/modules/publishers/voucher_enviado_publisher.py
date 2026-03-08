@@ -21,8 +21,8 @@ def publish_voucher_enviado(reserva_id: str):
     )
 
     event = {
-        "eventType": "VoucherEnviadoEvt",
-        "reservaId": reserva_id,
+        "type": "VoucherEnviadoEvt",
+        "id_reserva": reserva_id,
         "status": "ENVIADO"
     }
 
@@ -35,6 +35,6 @@ def publish_voucher_enviado(reserva_id: str):
         )
     )
 
-    print(f"Evento publicado: {ROUTING_KEY} para reserva {reserva_id}")
+    print(f"Evento publicado: {ROUTING_KEY} para reserva {reserva_id}", flush=True)
 
     connection.close()

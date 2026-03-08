@@ -106,7 +106,7 @@ class DespachadorRabbitMQ(Despachador):
                     routing_key = "evt.partnermanagement.aprobada"
                 elif tipo == "ReservaRechazadaManualEvt":
                     routing_key = "evt.partnermanagement.rechazada"
-                elif tipo == "ReservaConfirmadaLocalEvt":
+                elif tipo == "ReservaConfirmadaEvt":
                     routing_key = "evt.reserva.confirmada"
                 elif tipo == "VoucherEnviadoEvt":
                     routing_key = "evt.voucher.enviado"

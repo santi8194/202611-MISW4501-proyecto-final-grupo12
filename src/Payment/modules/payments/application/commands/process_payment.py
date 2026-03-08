@@ -25,7 +25,7 @@ class ProcessPayment:
         # simulación de procesamiento
         time.sleep(0.5)
 
-        if amount < 1000:
+        if amount < 5000:
 
             payment.approve()
             self.repository.save(payment)
