@@ -11,10 +11,11 @@ class ReservationRepository:
 
         model = ReservationModel(
             id=reservation.id,
-            booking_id=reservation.booking_id,
-            hotel_id=reservation.hotel_id,
+            reservation_id=reservation.reservation_id,
+            room_id=reservation.room_id,
             room_type=reservation.room_type,
             guest_name=reservation.guest_name,
+            hotel_id=reservation.hotel_id,
             state=reservation.state
         )
 
@@ -22,13 +23,22 @@ class ReservationRepository:
         db.commit()
         db.close()
 
+    def obtain_by_room_id(self, room_id):
+        
+        db: Session = SessionLocal()
 
-    def obtain_by_booking(self, booking_id):
+        reservation = db.query(ReservationModel)\
+            .filter(ReservationModel.room_id == room_id)\
+            .first()
+        db.close()
+        return reservation
+
+    def obtain_by_reservation_id(self, reservation_id):
 
         db: Session = SessionLocal()
 
         reservation = db.query(ReservationModel)\
-            .filter(ReservationModel.booking_id == str(booking_id))\
+            .filter(ReservationModel.reservation_id == str(reservation_id))\
             .first()
 
         db.close()

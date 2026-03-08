@@ -9,7 +9,7 @@ class CancelReservation:
 
     def execute(self, reservation_id):
 
-        reservation = self.repository.obtain_by_booking(reservation_id)
+        reservation = self.repository.obtain_by_reservation_id(reservation_id)
 
         if not reservation:
             return {"message": "Reservation not found"}
@@ -22,8 +22,8 @@ class CancelReservation:
         self.repository.save(reservation)
 
         event = PMSReservationCancelled(
-            reservation.id,
-            reservation.booking_id
+            reservation.reservation_id,
+            reservation.room_id
         )
 
         self.event_bus.publish_event(
