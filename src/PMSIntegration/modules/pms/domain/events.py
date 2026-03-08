@@ -16,7 +16,7 @@ class PMSReservationConfirmed:
 class PMSReservationFailed:
 
     def __init__(self, booking_id, reason):
-        self.routing_key = "evt.pms.confirmacion_fallida"
+        self.routing_key = "evt.pms.rechazada"
         self.type = "ReservaRechazadaPmsEvt"
         self.booking_id = booking_id
         self.reason = reason
