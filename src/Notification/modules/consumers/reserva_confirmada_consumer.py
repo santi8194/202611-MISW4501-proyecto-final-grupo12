@@ -22,8 +22,9 @@ def callback(ch, method, properties, body):
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
-        reserva_id = data.get("reservaId")
-        email = data.get("emailCliente")
+        payload = data.get("data", data)
+        reserva_id = payload.get("id_reserva")
+        email = payload.get("emailCliente")
 
         print(f"Procesando reserva {reserva_id} para {email}")
 
@@ -31,6 +32,8 @@ def callback(ch, method, properties, body):
         publish_voucher_enviado(reserva_id)
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        print(f"Evento recibido y procesado: {event_type} para reserva {reserva_id}", flush=True)
 
     except Exception as e:
         print("Error procesando evento:", e)

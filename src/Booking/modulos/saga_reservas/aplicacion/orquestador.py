@@ -67,14 +67,21 @@ class OrquestadorSagaReservas:
             reserva = repo_reservas.obtener_por_id(str(id_reserva))
             
             if reserva:
+                from Booking.modulos.reserva.dominio.eventos import ReservaConfirmadaEvt
+                from datetime import datetime
+                
                 reserva.confirmar_reserva()
+                reserva.eventos.clear()
+                evento_local = ReservaConfirmadaEvt(id_reserva=reserva.id, fecha_actualizacion=datetime.now())
+                reserva.agregar_evento(evento_local)
+                
                 repo_reservas.actualizar(reserva)
-                db.session.commit()
+                self.uow.agregar_eventos(reserva.eventos)
                 
                 print(f"✅ [ORQUESTADOR -> LOCAL] Reserva {reserva.id} CONFIRMADA localmente en BD.")
                 
                 # Avanzamos al siguiente paso informando que ya lo hicimos
-                saga.avanzar_paso(siguiente_paso.index, "ReservaConfirmadaLocalEvt", {"id_reserva": str(id_reserva)})
+                saga.avanzar_paso(siguiente_paso.index, "ReservaConfirmadaEvt", {"id_reserva": str(id_reserva)})
                 
                 # Revisar si la saga completó el happy path local e instigarlo a continuar
                 paso_final = next((p for p in pasos if p.index == siguiente_paso.index + 1), None)

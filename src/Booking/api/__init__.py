@@ -66,7 +66,7 @@ def create_app(config_name=None):
                 SagaStepsDefinitionDTO(index=1, id_flujo="RESERVA_ESTANDAR", version=1, comando="ProcesarPagoCmd", evento="PagoExitosoEvt", error="PagoRechazadoEvt", compensacion="ReversarPagoCmd"),
                 SagaStepsDefinitionDTO(index=2, id_flujo="RESERVA_ESTANDAR", version=1, comando="ConfirmarReservaPmsCmd", evento="ConfirmacionPmsExitosaEvt", error="ReservaRechazadaPmsEvt", compensacion="CancelarReservaPmsCmd"),
                 SagaStepsDefinitionDTO(index=3, id_flujo="RESERVA_ESTANDAR", version=1, comando="SolicitarAprobacionManualCmd", evento="ReservaAprobadaManualEvt", error="ReservaRechazadaManualEvt", compensacion=None),
-                SagaStepsDefinitionDTO(index=4, id_flujo="RESERVA_ESTANDAR", version=1, comando="ConfirmarReservaLocalCmd", evento="ReservaConfirmadaLocalEvt", error="FallaActualizacionLocalEvt", compensacion="CancelarReservaLocalCmd"),
+                SagaStepsDefinitionDTO(index=4, id_flujo="RESERVA_ESTANDAR", version=1, comando="ConfirmarReservaLocalCmd", evento="ReservaConfirmadaEvt", error="FallaActualizacionLocalEvt", compensacion="CancelarReservaLocalCmd"),
                 SagaStepsDefinitionDTO(index=5, id_flujo="RESERVA_ESTANDAR", version=1, comando="MarcarSagaEsperandoVoucher", evento="VoucherEnviadoEvt", error="FalloEnvioVoucherEvt", compensacion="NotificarFalloTecnicoCmd")
             ]
             db.session.add_all(pasos)

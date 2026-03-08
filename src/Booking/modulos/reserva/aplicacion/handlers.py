@@ -5,7 +5,7 @@ from Booking.modulos.reserva.aplicacion.comandos import (
 )
 from Booking.modulos.reserva.dominio.entidades import Reserva
 from Booking.modulos.reserva.dominio.eventos import (
-    ReservaConfirmadaLocalEvt, FallaActualizacionLocalEvt
+    ReservaConfirmadaEvt, FallaActualizacionLocalEvt
 )
 from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
 from Booking.config.uow import UnidadTrabajoHibrida
@@ -60,7 +60,7 @@ class ConfirmarReservaLocalHandler(Handler):
         self.repositorio = repositorio
         self.uow = uow
     
-    def handle(self, comando: ConfirmarReservaLocalCmd) -> ReservaConfirmadaLocalEvt:
+    def handle(self, comando: ConfirmarReservaLocalCmd) -> ReservaConfirmadaEvt:
         with self.uow:
             reserva: Reserva = self.repositorio.obtener_por_id(str(comando.id_reserva))
             if not reserva:
@@ -71,7 +71,7 @@ class ConfirmarReservaLocalHandler(Handler):
             
             # Limpiamos los eventos genéricos y en su lugar anexamos nuestro evento de ruteo local.
             reserva.eventos.clear() 
-            evento_local = ReservaConfirmadaLocalEvt(
+            evento_local = ReservaConfirmadaEvt(
                 id_reserva=reserva.id, 
                 fecha_actualizacion=datetime.now()
             )

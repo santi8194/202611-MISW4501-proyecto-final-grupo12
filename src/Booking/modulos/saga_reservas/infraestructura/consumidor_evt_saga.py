@@ -2,6 +2,9 @@ import pika
 import json
 import os
 import sys
+# Agregar el directorio Booking al path para poder importar módulos propios en ejecución standalone
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
+
 import argparse
 import uuid
 import time
