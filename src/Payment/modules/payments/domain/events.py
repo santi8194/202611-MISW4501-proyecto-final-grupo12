@@ -35,3 +35,16 @@ class PaymentRefunded:
             "id_pago": self.payment_id,
             "id_reserva": self.reservation_id
         }
+    
+class PaymentRefundFailed:
+    def __init__(self, reservation_id, reason):
+        self.routing_key = "evt.pago.reverso_fallido"
+        self.type = "PagoReversoFallidoEvt"
+        self.reservation_id = reservation_id
+        self.reason = reason
+
+    def to_dict(self):
+        return {
+            "id_reserva": self.reservation_id,
+            "razon": self.reason
+        }

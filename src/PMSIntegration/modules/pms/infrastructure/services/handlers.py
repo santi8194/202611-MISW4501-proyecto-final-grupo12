@@ -7,32 +7,32 @@ from modules.pms.infrastructure.services.event_bus import EventBus
 
 def handle_confirm_reservation(data):
 
-    booking_id = data["id_reserva"]
+    reservation_id = data["id_reserva"]
     room_id = data["id_habitacion"]
 
-    print(f"[PMS] Command received: ConfirmReservation for booking {booking_id}")
+    print(f"[PMS] Command received: ConfirmReservation for reservation {reservation_id}")
 
     repository = ReservationRepository()
     event_bus = EventBus()
 
     use_case = ConfirmReservation(repository, event_bus)
 
-    result = use_case.execute(booking_id, room_id)
+    result = use_case.execute(reservation_id, room_id)
 
     print("[PMS] Result:", result)
 
 
 def handle_cancel_reservation(data):
 
-    booking_id = data["id_reserva"]
+    reservation_id = data["id_reserva"]
 
-    print(f"[PMS] Command received: CancelReservation for booking {booking_id}")
+    print(f"[PMS] Command received: CancelReservation for reservation {reservation_id}")
 
     repository = ReservationRepository()
     event_bus = EventBus()
 
     use_case = CancelReservation(repository, event_bus)
 
-    result = use_case.execute(booking_id)
+    result = use_case.execute(reservation_id)
 
     print("[PMS] Result:", result)

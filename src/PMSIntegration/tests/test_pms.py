@@ -6,7 +6,7 @@ def test_create_reservation():
     service = PMSService()
 
     result = service.create_reservation(
-        booking_id=uuid4(),
+        reservation_id=uuid4(),
         hotel_id="HTL001",
         room_type="DOBLE",
         guest_name="Mariana Diaz"
