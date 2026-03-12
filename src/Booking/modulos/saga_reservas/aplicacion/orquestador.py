@@ -120,7 +120,7 @@ class OrquestadorSagaReservas:
                     if saga.historial:
                         habitacion_ctx = saga.historial[0].payload_snapshot.get('id_habitacion')
                     if not habitacion_ctx:
-                        habitacion_ctx = str(uuid.uuid4())
+                        raise ValueError(f"Falta 'id_habitacion' en la historia de la saga para el comando {comando_nombre}")
                     kwargs_filtrados['id_habitacion'] = uuid.UUID(str(habitacion_ctx)) if isinstance(habitacion_ctx, str) else habitacion_ctx
                     
                 if 'monto' in parametros_validos and 'monto' not in kwargs_filtrados:
@@ -310,7 +310,7 @@ class OrquestadorSagaReservas:
                             if not habitacion and saga.historial:
                                 habitacion = saga.historial[0].payload_snapshot.get('id_habitacion')
                             if not habitacion:
-                                habitacion = str(uuid.uuid4())
+                                raise ValueError("Falta 'id_habitacion' en la saga para compensar CancelarReservaPmsCmd")
                             cmd = CancelarReservaPmsCmd(id_reserva=id_reserva, id_habitacion=uuid.UUID(str(habitacion)))
                             comandos_compensatorios.append(cmd)
                             kwargs_log["id_habitacion"] = str(habitacion)
