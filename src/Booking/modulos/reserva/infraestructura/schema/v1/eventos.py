@@ -1,20 +1,28 @@
 import uuid
+from typing import Optional
 from Booking.seedwork.infraestructura.schema.v1.eventos import EventoIntegracion
 
 class ReservaCreadaPayload:
-    def __init__(self, id_reserva: str, id_cliente: str, estado: str, fecha_creacion: str):
+    def __init__(self, id_reserva: str, id_cliente: str, estado: str, fecha_creacion: str, id_habitacion: Optional[str] = None, monto: Optional[float] = None):
         self.id_reserva = id_reserva
         self.id_cliente = id_cliente
         self.estado = estado
         self.fecha_creacion = fecha_creacion
+        self.id_habitacion = id_habitacion
+        self.monto = monto
 
     def to_dict(self):
-        return {
+        res = {
             "id_reserva": self.id_reserva,
             "id_cliente": self.id_cliente,
             "estado": self.estado,
             "fecha_creacion": self.fecha_creacion
         }
+        if self.id_habitacion is not None:
+            res["id_habitacion"] = self.id_habitacion
+        if self.monto is not None:
+            res["monto"] = self.monto
+        return res
 
 class EventoReservaCreada(EventoIntegracion):
     def __init__(self, data: ReservaCreadaPayload, id: str = None, time: str = None, ingestion: str = None, specversion: str = "v1", type: str = "ReservaCreada", datacontenttype: str = "application/json", service_name: str = "booking"):
