@@ -124,10 +124,11 @@ class OrquestadorSagaReservas:
                     kwargs_filtrados['id_habitacion'] = uuid.UUID(str(habitacion_ctx)) if isinstance(habitacion_ctx, str) else habitacion_ctx
                     
                 if 'monto' in parametros_validos and 'monto' not in kwargs_filtrados:
-                    # Lo mismo para monto en caso de que se haya perdido dict
-                    monto_ctx = 1500.0
+                    monto_ctx = None
                     if saga.historial:
-                        monto_ctx = saga.historial[0].payload_snapshot.get('monto', 1500.0)
+                        monto_ctx = saga.historial[0].payload_snapshot.get('monto')
+                    if monto_ctx is None:
+                        raise ValueError(f"Falta 'monto' en la historia de la saga para el comando {comando_nombre}")
                     kwargs_filtrados['monto'] = float(monto_ctx)
                         
                 # Registrar el comando emitido CON los parametros correctos inyectados
@@ -302,9 +303,14 @@ class OrquestadorSagaReservas:
                         kwargs_log = {"id_reserva": str(id_reserva)}
                         
                         if ClaseCompensacion == ReversarPagoCmd:
-                            cmd = ReversarPagoCmd(id_reserva=id_reserva, monto=1500.0)
+                            monto_reversa = log.payload_snapshot.get('monto')
+                            if monto_reversa is None and saga.historial:
+                                monto_reversa = saga.historial[0].payload_snapshot.get('monto')
+                            if monto_reversa is None:
+                                raise ValueError("Falta 'monto' en la saga para compensar ReversarPagoCmd")
+                            cmd = ReversarPagoCmd(id_reserva=id_reserva, monto=float(monto_reversa))
                             comandos_compensatorios.append(cmd)
-                            kwargs_log["monto"] = 1500.0
+                            kwargs_log["monto"] = float(monto_reversa)
                         elif ClaseCompensacion == CancelarReservaPmsCmd:
                             habitacion = log.payload_snapshot.get('id_habitacion')
                             if not habitacion and saga.historial:
