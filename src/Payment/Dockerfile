@@ -8,6 +8,8 @@ ENV PYTHONUNBUFFERED=1
 # Directorio de trabajo
 WORKDIR /app
 
+RUN mkdir -p /app/data
+
 # Copiamos requirements primero (cache eficiente)
 COPY requirements.txt .
 
