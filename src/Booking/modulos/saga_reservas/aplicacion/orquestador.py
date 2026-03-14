@@ -132,12 +132,19 @@ class OrquestadorSagaReservas:
                     kwargs_filtrados['monto'] = float(monto_ctx)
 
                 if 'fecha_reserva' in parametros_validos and 'fecha_reserva' not in kwargs_filtrados:
+                    # Intentar buscar en TODO el historial de la saga empezando por el evento inicial (ReservaCreada)
                     fecha_ctx = None
                     if saga.historial:
-                        fecha_ctx = saga.historial[0].payload_snapshot.get('fecha_reserva')
+                        for log in saga.historial:
+                            if log.payload_snapshot and log.payload_snapshot.get('fecha_reserva'):
+                                fecha_ctx = log.payload_snapshot.get('fecha_reserva')
+                                break
+                    
                     if not fecha_ctx:
-                         # Fallback for old sagas or missing data in early logs
+                         # Fallback temporal con advertencia en logs
+                         print(f"⚠️ [Orquestador] ADVERTENCIA: No se encontró 'fecha_reserva' en ninguna parte de la historia para {comando_nombre}.")
                          fecha_ctx = "2026-03-14"
+                    
                     kwargs_filtrados['fecha_reserva'] = fecha_ctx
                         
                 # Registrar el comando emitido CON los parametros correctos inyectados

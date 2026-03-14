@@ -26,8 +26,9 @@ class ConfirmReservation:
                 "current_reservation_id": existing_reservation.reservation_id,
             }
 
-        # La validacion de habitacion ocupada ahora la hace el PK de la BD (room_id + fecha_reserva)
-        # pero mantenemos el sleep para simular latencia y forzar colisiones en los tests.
+        # NOTA: La validación de habitación ocupada se hace por la restricción UNIQUE(room_id, fecha_reserva) en la BD.
+        # No usamos el check manual de room_id solo, ya que impediría reservar la misma habitación en días distintos.
+
         time.sleep(0.5)
 
         try:
@@ -48,6 +49,7 @@ class ConfirmReservation:
                 reservation_id=id_reserva,
                 fecha_reserva=fecha_reserva
             )
+            # CRÍTICO: El parámetro debe ser 'payload', NO 'data'
             self.event_bus.publish_event(
                 routing_key=pms_event.routing_key,
                 event_type=pms_event.type,
@@ -68,18 +70,19 @@ class ConfirmReservation:
             print(f"[PMS] StaleDataError caught for room {id_habitacion}. Overbooking avoided.")
             pms_event = PMSReservationFailed(
                 reservation_id=id_reserva,
-                reason="Protección contra overbooking: Habitación ya reservada para esta fecha (Lock Optimista).",
+                reason="Protección contra overbooking: Habitación ya reservada para esta fecha.",
                 fecha_reserva=fecha_reserva
             )
         except Exception as e:
-            print(f"[PMS] Error inesperado en PMS: {str(e)}")
+            # Captura cualquier otro error (ej: fallo de conexión a RabbitMQ) y genera evento de fallo
+            print(f"[PMS] Error inesperado: {str(e)}")
             pms_event = PMSReservationFailed(
                 reservation_id=id_reserva,
                 reason=str(e),
                 fecha_reserva=fecha_reserva
             )
 
-        # Publicar el evento de fallo
+        # Publicar evento de fallo con parámetro 'payload'
         self.event_bus.publish_event(
             routing_key=pms_event.routing_key,
             event_type=pms_event.type,
@@ -88,5 +91,6 @@ class ConfirmReservation:
 
         return {
             "event_generated": pms_event.type,
-            "motivo": pms_event.reason
+            "motivo": pms_event.reason,
+            "id_reserva": id_reserva
         }
