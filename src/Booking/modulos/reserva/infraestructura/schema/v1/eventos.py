@@ -3,13 +3,14 @@ from typing import Optional
 from Booking.seedwork.infraestructura.schema.v1.eventos import EventoIntegracion
 
 class ReservaCreadaPayload:
-    def __init__(self, id_reserva: str, id_cliente: str, estado: str, fecha_creacion: str, id_habitacion: Optional[str] = None, monto: Optional[float] = None):
+    def __init__(self, id_reserva: str, id_cliente: str, estado: str, fecha_creacion: str, id_habitacion: Optional[str] = None, monto: Optional[float] = None, fecha_reserva: Optional[str] = None):
         self.id_reserva = id_reserva
         self.id_cliente = id_cliente
         self.estado = estado
         self.fecha_creacion = fecha_creacion
         self.id_habitacion = id_habitacion
         self.monto = monto
+        self.fecha_reserva = fecha_reserva
 
     def to_dict(self):
         res = {
@@ -22,6 +23,8 @@ class ReservaCreadaPayload:
             res["id_habitacion"] = self.id_habitacion
         if self.monto is not None:
             res["monto"] = self.monto
+        if self.fecha_reserva is not None:
+            res["fecha_reserva"] = self.fecha_reserva
         return res
 
 class EventoReservaCreada(EventoIntegracion):

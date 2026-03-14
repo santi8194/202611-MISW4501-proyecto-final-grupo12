@@ -32,7 +32,8 @@ class MapeadorEventosReserva(Mapeador):
                 estado="PENDIENTE",
                 fecha_creacion=ev.fecha_evento.isoformat() if hasattr(ev, 'fecha_evento') else datetime.datetime.now().isoformat(),
                 id_habitacion=str(ev.id_habitacion) if getattr(ev, 'id_habitacion', None) else None,
-                monto=float(ev.monto) if getattr(ev, 'monto', None) is not None else None
+                monto=float(ev.monto) if getattr(ev, 'monto', None) is not None else None,
+                fecha_reserva=str(ev.fecha_reserva) if getattr(ev, 'fecha_reserva', None) else None
             )
             evento_integracion = EventoReservaCreada(
                 id=str(ev.id),

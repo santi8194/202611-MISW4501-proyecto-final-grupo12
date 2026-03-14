@@ -9,15 +9,16 @@ def handle_confirm_reservation(data):
 
     reservation_id = data["id_reserva"]
     room_id = data["id_habitacion"]
+    fecha_reserva = data.get("fecha_reserva", "2026-03-14")
 
-    print(f"[PMS] Command received: ConfirmReservation for reservation {reservation_id}")
+    print(f"[PMS] Command received: ConfirmReservation for reservation {reservation_id} on {fecha_reserva}")
 
     repository = ReservationRepository()
     event_bus = EventBus()
 
     use_case = ConfirmReservation(repository, event_bus)
 
-    result = use_case.execute(reservation_id, room_id)
+    result = use_case.execute(reservation_id, room_id, fecha_reserva)
 
     print("[PMS] Result:", result)
 

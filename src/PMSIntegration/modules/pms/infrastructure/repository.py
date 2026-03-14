@@ -16,7 +16,9 @@ class ReservationRepository:
             room_type=reservation.room_type,
             guest_name=reservation.guest_name,
             hotel_id=reservation.hotel_id,
-            state=reservation.state
+            fecha_reserva=reservation.fecha_reserva,
+            state=reservation.state,
+            version=reservation.version
         )
 
         db.merge(model)

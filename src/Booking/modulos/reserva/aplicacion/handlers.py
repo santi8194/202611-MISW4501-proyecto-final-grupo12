@@ -23,7 +23,8 @@ class CrearReservaHoldHandler(Handler):
             reserva.iniciar_reserva_hold(
                 id_usuario=comando.id_usuario,
                 id_habitacion=comando.id_habitacion,
-                monto=comando.monto
+                monto=comando.monto,
+                fecha_reserva=comando.fecha_reserva
             )
             
             self.uow.agregar_eventos(reserva.eventos)

@@ -30,6 +30,7 @@ class MockRepository:
             room_type=reservation.room_type,
             guest_name=reservation.guest_name,
             hotel_id=reservation.hotel_id,
+            fecha_reserva=reservation.fecha_reserva,
             state=reservation.state,
             version=reservation.version
         )
@@ -49,32 +50,18 @@ class MockEventBus:
 def setup_db():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    # Insert a dummy base record that both threads will try to 'UPDATE' conceptually, 
-    # Or in our case since it's an UPSERT (merge) with optimistic locking, 
-    # we need the record to already exist so the version check triggers on the second thread.
-    
     room_id_test = "101"
-    initial_res = ReservationModel(
-        id=str(uuid4()),
-        reservation_id="BASE-ID-123",
-        room_id=room_id_test,
-        room_type="SUITE",
-        guest_name="Base User",
-        state="AVAILABLE",
-        hotel_id="HotelXYZ",
-        version=1
-    )
-    db.add(initial_res)
-    db.commit()
+    fecha_reserva_test = "2026-11-01"
+    
     db.close()
     
-    yield room_id_test # Pass room id to test
+    yield room_id_test, fecha_reserva_test # Pass room id and date to test
     
     Base.metadata.drop_all(bind=engine)
 
 
 def test_concurrent_reservations_optimistic_locking(setup_db):
-    room_id = setup_db
+    room_id, fecha_reserva = setup_db
     
     repo1 = MockRepository()
     bus1 = MockEventBus()
@@ -84,35 +71,19 @@ def test_concurrent_reservations_optimistic_locking(setup_db):
     bus2 = MockEventBus()
     use_case_2 = ConfirmReservation(repo2, bus2)
     
-    # We need to forcefully make them update the SAME database record to trigger the optimistic lock StaleDataError.
-    # Because `create()` generates a random `id` and `merge()` upserts based on Primary Key (`id`),
-    # if they have different `id`s, they will just INSERT two different rows and locking won't trigger.
-    # Let's intercept the `create` to force them to use the SAME PK so they collide on update.
-    
-    # Get the PK of the base record
-    db = SessionLocal()
-    base_record = db.query(ReservationModel).filter_by(room_id=room_id).first()
-    shared_pk = base_record.id
-    db.close()
-    
-    original_create = Reservation.create
-    
-    def mocked_create(*args, **kwargs):
-        res = original_create(*args, **kwargs)
-        res.id = shared_pk  # Force same PK so `merge` translates to `UPDATE`
-        return res
-        
-    Reservation.create = staticmethod(mocked_create)
+    # No PK mocking is needed anymore. Because of the UniqueConstraint on (room_id, fecha_reserva),
+    # generating two different `id`s (UUIDs) will still result in the database natively blocking
+    # the second INSERT with an `IntegrityError`. This is much cleaner and closer to reality.
 
     results = []
 
-    def run_use_case(use_case, res_id, r_id):
-        res = use_case.execute(res_id, r_id)
+    def run_use_case(use_case, res_id, r_id, fecha):
+        res = use_case.execute(res_id, r_id, fecha)
         results.append((res_id, res))
 
     # We start two threads attempting to book the same room, resolving to the same PK.
-    t1 = threading.Thread(target=run_use_case, args=(use_case_1, "RES-1LA", room_id))
-    t2 = threading.Thread(target=run_use_case, args=(use_case_2, "RES-2LB", room_id))
+    t1 = threading.Thread(target=run_use_case, args=(use_case_1, "RES-1LA", room_id, fecha_reserva))
+    t2 = threading.Thread(target=run_use_case, args=(use_case_2, "RES-2LB", room_id, fecha_reserva))
 
     t1.start()
     t2.start()
@@ -120,15 +91,14 @@ def test_concurrent_reservations_optimistic_locking(setup_db):
     t1.join()
     t2.join()
     
-    # Restore original method
-    Reservation.create = staticmethod(original_create)
+    t2.join()
 
     events_fired = bus1.events + bus2.events
     
     success_count = events_fired.count("ConfirmacionPmsExitosaEvt")
     failure_count = events_fired.count("ReservaRechazadaPmsEvt")
 
-    # One must succeed (UPDATE version 1 -> 2)
+    # One must succeed (INSERT successful)
     assert success_count == 1
-    # The other must fail (UPDATE version 1 -> 2 triggers StaleDataError because version is already 2)
+    # The other must fail (INSERT triggers IntegrityError because UNIQUE(room_id, fecha_reserva) constraint violated)
     assert failure_count == 1

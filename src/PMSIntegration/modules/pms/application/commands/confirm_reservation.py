@@ -1,4 +1,5 @@
 import time
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
 
 from modules.pms.domain.entities import Reservation
@@ -13,7 +14,7 @@ class ConfirmReservation:
         self.repository = repository
         self.event_bus = event_bus
 
-    def execute(self, id_reserva, id_habitacion):
+    def execute(self, id_reserva, id_habitacion, fecha_reserva):
 
         existing_reservation = self.repository.obtain_by_reservation_id(id_reserva)
 
@@ -47,16 +48,14 @@ class ConfirmReservation:
         time.sleep(0.5)
 
         try:
-            # simulación de fallo
-            if id_reserva.endswith("5"):
-                raise Exception("NO_AVAILABILITY")
-            
+
             pmsReservation = Reservation.create(
                 id_reserva,
                 id_habitacion,
                 "SUITE",
                 "User123",
                 "HotelXYZ",
+                fecha_reserva
             )
 
             self.repository.save(pmsReservation)
@@ -66,6 +65,12 @@ class ConfirmReservation:
                 pmsReservation.reservation_id
             )
 
+        except IntegrityError:
+            print(f"[PMS] IntegrityError caught for room {id_habitacion} on {fecha_reserva}. Overbooking avoided.")
+            event = PMSReservationFailed(
+                id_reserva,
+                "Protección contra overbooking activada (UniqueConstraint). Habitación ya tomada para esa fecha."
+            )
         except StaleDataError:
             print(f"[PMS] StaleDataError caught for room {id_habitacion}. Overbooking avoided.")
             event = PMSReservationFailed(

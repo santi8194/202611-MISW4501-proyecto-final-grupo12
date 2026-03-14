@@ -15,11 +15,13 @@ def iniciar_reserva_hold():
         id_usuario = uuid.UUID(data.get('id_usuario'))
         id_habitacion = uuid.UUID(data.get('id_habitacion'))
         monto = float(data.get('monto'))
+        fecha_reserva = data.get('fecha_reserva') # Expected YYYY-MM-DD
 
         comando = CrearReservaHold(
             id_usuario=id_usuario,
             id_habitacion=id_habitacion,
-            monto=monto
+            monto=monto,
+            fecha_reserva=fecha_reserva
         )
 
         uow = UnidadTrabajoHibrida()
