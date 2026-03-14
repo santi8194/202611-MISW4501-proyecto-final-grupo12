@@ -11,6 +11,7 @@ class Reservation:
     guest_name: str
     hotel_id: str
     state: str
+    version: int = 1
 
     @staticmethod
     def create(reservation_id, room_id, room_type, guest_name, hotel_id):
@@ -21,7 +22,8 @@ class Reservation:
             room_type=room_type,
             guest_name=guest_name,
             hotel_id=hotel_id,
-            state="CONFIRMED"
+            state="CONFIRMED",
+            version=1
         )
     
     def cancel(self):

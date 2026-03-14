@@ -220,7 +220,7 @@ class OrquestadorSagaReservas:
             paso_fallido = self._obtener_paso_por_error(saga.id_flujo, saga.version_ejecucion, evento_recibido)
             if paso_fallido:
                 print(f"[Orquestador Agnostico] 🚨 Evento de error detectado: {evento_recibido}. Desviando a compensación.")
-                self.compensar_saga(id_reserva, evento_recibido)
+                self.compensar_saga(id_reserva, evento_recibido, payload_recibido)
                 return
 
             # Buscar en el routing slip (base de datos) qué paso produjo este evento como ÉXITO
@@ -259,7 +259,7 @@ class OrquestadorSagaReservas:
             self.repositorio.actualizar(saga)
             self.uow.commit()
 
-    def compensar_saga(self, id_reserva: uuid.UUID, evento_fallo: str):
+    def compensar_saga(self, id_reserva: uuid.UUID, evento_fallo: str, payload_fallo: dict = None):
         """El motor LIFO que revierte la transacción distribuida leyendo de los pasos parametrizados"""
         with self.uow:
             saga = self.repositorio.buscar_por_reserva(str(id_reserva))
@@ -270,7 +270,7 @@ class OrquestadorSagaReservas:
                 return
 
             print(f"\n[ORQUESTADOR-FALLO] Iniciando compensación para reserva {id_reserva}. Evento fallo reportado: {evento_fallo}")
-            saga.iniciar_compensacion(evento_fallo, f"Fallo reportado: {evento_fallo}")
+            saga.iniciar_compensacion(evento_fallo, payload_original=payload_fallo)
             comandos_compensatorios = []
             
             # Buscar si el evento_fallo coincide con un 'error' esperado en la definición

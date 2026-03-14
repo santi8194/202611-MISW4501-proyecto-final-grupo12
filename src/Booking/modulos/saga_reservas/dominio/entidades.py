@@ -41,16 +41,21 @@ class SagaInstance(AgregacionRaiz):
         )
         self.historial.append(log)
 
-    def iniciar_compensacion(self, accion: str, motivo: str):
+    def iniciar_compensacion(self, accion: str, payload_original: dict = None):
         self.estado_global = EstadoSaga.COMPENSANDO
         self.ultima_actualizacion = datetime.datetime.now()
         
+        # Use provided payload or fallback to generic
+        payload = {"id_reserva": str(self.id_reserva), "motivo": "Fallo reportado"}
+        if payload_original:
+            payload.update(payload_original)
+            
         log = SagaExecutionLog(
             id=uuid.uuid4(),
             id_instancia=self.id,
             tipo_mensaje=TipoMensajeSaga.EVENTO_RECIBIDO,
             accion=accion,
-            payload_snapshot={"id_reserva": str(self.id_reserva), "motivo": motivo}
+            payload_snapshot=payload
         )
         self.historial.append(log)
 

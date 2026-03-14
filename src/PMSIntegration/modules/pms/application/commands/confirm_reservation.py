@@ -1,4 +1,5 @@
 import time
+from sqlalchemy.orm.exc import StaleDataError
 
 from modules.pms.domain.entities import Reservation
 from modules.pms.domain.events import (
@@ -65,6 +66,12 @@ class ConfirmReservation:
                 pmsReservation.reservation_id
             )
 
+        except StaleDataError:
+            print(f"[PMS] StaleDataError caught for room {id_habitacion}. Overbooking avoided.")
+            event = PMSReservationFailed(
+                id_reserva,
+                "Protección contra overbooking activada (Bloqueo Optimista). Habitación ya tomada."
+            )
         except Exception as e:
             event = PMSReservationFailed(
                 id_reserva,
