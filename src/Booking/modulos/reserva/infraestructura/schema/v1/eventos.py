@@ -3,29 +3,25 @@ from typing import Optional
 from Booking.seedwork.infraestructura.schema.v1.eventos import EventoIntegracion
 
 class ReservaCreadaPayload:
-    def __init__(self, id_reserva: str, id_cliente: str, estado: str, fecha_creacion: str, id_habitacion: Optional[str] = None, monto: Optional[float] = None, fecha_reserva: Optional[str] = None):
+    def __init__(self, id_reserva: str, id_usuario: str, id_habitacion: str, monto: float, fecha_reserva: str, estado: str, fecha_creacion: str):
         self.id_reserva = id_reserva
-        self.id_cliente = id_cliente
-        self.estado = estado
-        self.fecha_creacion = fecha_creacion
+        self.id_usuario = id_usuario
         self.id_habitacion = id_habitacion
         self.monto = monto
         self.fecha_reserva = fecha_reserva
+        self.estado = estado
+        self.fecha_creacion = fecha_creacion
 
     def to_dict(self):
-        res = {
+        return {
             "id_reserva": self.id_reserva,
-            "id_cliente": self.id_cliente,
+            "id_usuario": self.id_usuario,
+            "id_habitacion": self.id_habitacion,
+            "monto": self.monto,
+            "fecha_reserva": self.fecha_reserva,
             "estado": self.estado,
             "fecha_creacion": self.fecha_creacion
         }
-        if self.id_habitacion is not None:
-            res["id_habitacion"] = self.id_habitacion
-        if self.monto is not None:
-            res["monto"] = self.monto
-        if self.fecha_reserva is not None:
-            res["fecha_reserva"] = self.fecha_reserva
-        return res
 
 class EventoReservaCreada(EventoIntegracion):
     def __init__(self, data: ReservaCreadaPayload, id: str = None, time: str = None, ingestion: str = None, specversion: str = "v1", type: str = "ReservaCreada", datacontenttype: str = "application/json", service_name: str = "booking"):

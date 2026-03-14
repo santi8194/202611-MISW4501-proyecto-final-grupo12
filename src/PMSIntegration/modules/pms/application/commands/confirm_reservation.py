@@ -26,10 +26,28 @@ class ConfirmReservation:
                 "current_reservation_id": existing_reservation.reservation_id,
             }
 
-        # NOTA: La validación de habitación ocupada se hace por la restricción UNIQUE(room_id, fecha_reserva) en la BD.
-        # No usamos el check manual de room_id solo, ya que impediría reservar la misma habitación en días distintos.
+        # Validación de overbooking: Búsqueda por habitación + fecha + estado activo.
+        # Un estado CANCELLED no bloquea la habitación, lo que permite re-reservar una habitación
+        # que fue previamente cancelada para la misma fecha.
+        active_booking = self.repository.obtain_active_by_room_and_date(id_habitacion, fecha_reserva)
+        if active_booking:
+            print(f"[PMS] Room {id_habitacion} is already ACTIVELY booked on {fecha_reserva} (State: {active_booking.state})")
+            pms_event = PMSReservationFailed(
+                reservation_id=id_reserva,
+                reason=f"Protección contra overbooking: Habitación ya confirmada para la fecha {fecha_reserva}.",
+                fecha_reserva=fecha_reserva
+            )
+            self.event_bus.publish_event(
+                routing_key=pms_event.routing_key,
+                event_type=pms_event.type,
+                payload=pms_event.to_dict()
+            )
+            return {
+                "message": "Room is already actively booked for this date",
+                "state": active_booking.state
+            }
 
-        time.sleep(0.5)
+        ##time.sleep(0.5)
 
         try:
             pmsReservation = Reservation.create(

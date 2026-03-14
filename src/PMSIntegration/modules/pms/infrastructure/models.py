@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, UniqueConstraint
+from sqlalchemy import Column, String, Integer
 from .database import Base
 
 class ReservationModel(Base):
@@ -14,10 +14,12 @@ class ReservationModel(Base):
     fecha_reserva = Column(String)
     version = Column(Integer, nullable=False, default=1)
 
-    __table_args__ = (
-        UniqueConstraint('room_id', 'fecha_reserva', name='_room_date_uc'),
-    )
-
+    # El control de concurrencia se hace a través de dos mecanismos:
+    # 1. Lógica de aplicación: obtain_active_by_room_and_date() verifica si existe
+    #    una reserva ACTIVA (no CANCELLED) para la misma habitación y fecha.
+    #    Esto permite múltiples registros CANCELLED para el mismo (room_id, fecha_reserva).
+    # 2. Bloqueo Optimista (Optimistic Locking): la columna 'version' delega en SQLAlchemy
+    #    la detección de colisiones en escrituras concurrentes (StaleDataError).
     __mapper_args__ = {
         "version_id_col": version
     }

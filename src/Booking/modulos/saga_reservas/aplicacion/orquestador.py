@@ -189,15 +189,16 @@ class OrquestadorSagaReservas:
                 
                 paso_inicial = pasos[0]
 
-                # Registramos el evento inicial (para que en reversa se compense primero o al final)
+                # Registramos el evento inicial usando el mismo formato que el schema de integracion
                 payload_inicial = {
                     "id_reserva": str(id_reserva), 
-                    "monto": monto, 
                     "id_usuario": str(id_usuario),
-                    "fecha_reserva": fecha_reserva
+                    "id_habitacion": str(id_habitacion) if id_habitacion else None,
+                    "monto": float(monto), 
+                    "fecha_reserva": fecha_reserva,
+                    "estado": "PENDIENTE",
+                    "fecha_creacion": str(saga.fecha_creacion)
                 }
-                if id_habitacion:
-                    payload_inicial["id_habitacion"] = str(id_habitacion)
                 saga.avanzar_paso(paso_inicial.index, "ReservaCreadaIntegracionEvt", payload_inicial)
 
                 # Avanzamos al paso 1 inmediatamente

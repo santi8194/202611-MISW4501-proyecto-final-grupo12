@@ -58,23 +58,25 @@ def procesar_mensaje(ch, method, properties, body):
                 # Extraer payload base
                 payload = mensaje.get('data', {})
                 id_reserva = payload.get('id_reserva') or mensaje.get('id_reserva')
-                id_usuario = payload.get('id_cliente') or mensaje.get('id_usuario', str(uuid.uuid4()))
-                monto = payload.get('monto') or mensaje.get('monto', 1500.0) # Valor por defecto seguro si no viaja
+                id_usuario = payload.get('id_usuario') or payload.get('id_cliente') or mensaje.get('id_usuario', str(uuid.uuid4()))
+                monto = payload.get('monto') or mensaje.get('monto', 1500.0)
                 id_habitacion = payload.get('id_habitacion') or mensaje.get('id_habitacion')
+                fecha_reserva = payload.get('fecha_reserva') or mensaje.get('fecha_reserva')
                 
                 if not id_reserva:
                      print("[SAGA WORKER] Ignorando evento: id_reserva vacío")
                      ch.basic_ack(delivery_tag=method.delivery_tag)
                      return
 
-                print(f"[SAGA WORKER] Iniciando Saga para reserva: {id_reserva}")
+                print(f"[SAGA WORKER] Iniciando Saga para reserva: {id_reserva} (Fecha: {fecha_reserva})")
                      
                 print(f"[SAGA WORKER] Llamando orquestador con id_reserva: {id_reserva}", flush=True)
                 res = orquestador.iniciar_saga(
                     id_reserva=uuid.UUID(str(id_reserva)),
                     id_usuario=uuid.UUID(str(id_usuario)),
                     monto=float(monto),
-                    id_habitacion=uuid.UUID(str(id_habitacion)) if id_habitacion else None
+                    id_habitacion=uuid.UUID(str(id_habitacion)) if id_habitacion else None,
+                    fecha_reserva=fecha_reserva
                 )
                 print(f"[SAGA WORKER] Orquestador terminó con resultado: {res}", flush=True)
                      
