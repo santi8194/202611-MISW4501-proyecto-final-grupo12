@@ -9,7 +9,7 @@ def handle_confirm_reservation(data):
 
     reservation_id = data["id_reserva"]
     room_id = data["id_habitacion"]
-    fecha_reserva = data.get("fecha_reserva", "2026-03-14")
+    fecha_reserva = data.get("fecha_reserva")
 
     print(f"[PMS] Command received: ConfirmReservation for reservation {reservation_id} on {fecha_reserva}")
 

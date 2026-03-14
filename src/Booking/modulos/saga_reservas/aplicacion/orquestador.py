@@ -128,8 +128,17 @@ class OrquestadorSagaReservas:
                     if saga.historial:
                         monto_ctx = saga.historial[0].payload_snapshot.get('monto')
                     if monto_ctx is None:
-                        raise ValueError(f"Falta 'monto' en la historia de la saga para el comando {comando_nombre}")
+                        raise ValueError(f"Falta 'monto' en la historia de la saga for the command {comando_nombre}")
                     kwargs_filtrados['monto'] = float(monto_ctx)
+
+                if 'fecha_reserva' in parametros_validos and 'fecha_reserva' not in kwargs_filtrados:
+                    fecha_ctx = None
+                    if saga.historial:
+                        fecha_ctx = saga.historial[0].payload_snapshot.get('fecha_reserva')
+                    if not fecha_ctx:
+                         # Fallback for old sagas or missing data in early logs
+                         fecha_ctx = "2026-03-14"
+                    kwargs_filtrados['fecha_reserva'] = fecha_ctx
                         
                 # Registrar el comando emitido CON los parametros correctos inyectados
                 payload_final_log = kwargs_filtrados.copy()
@@ -149,7 +158,7 @@ class OrquestadorSagaReservas:
                 print(f"[Orquestador] Comando Externo {comando_nombre} emitido para reserva {id_reserva}")
                 self.uow.commit()
 
-    def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float, id_habitacion: uuid.UUID = None):
+    def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float, id_habitacion: uuid.UUID = None, fecha_reserva: str = None):
         """Invocado cuando la reserva inicial pasa a PENDIENTE"""
         try:
             with self.uow:
@@ -174,7 +183,12 @@ class OrquestadorSagaReservas:
                 paso_inicial = pasos[0]
 
                 # Registramos el evento inicial (para que en reversa se compense primero o al final)
-                payload_inicial = {"id_reserva": str(id_reserva), "monto": monto, "id_usuario": str(id_usuario)}
+                payload_inicial = {
+                    "id_reserva": str(id_reserva), 
+                    "monto": monto, 
+                    "id_usuario": str(id_usuario),
+                    "fecha_reserva": fecha_reserva
+                }
                 if id_habitacion:
                     payload_inicial["id_habitacion"] = str(id_habitacion)
                 saga.avanzar_paso(paso_inicial.index, "ReservaCreadaIntegracionEvt", payload_inicial)

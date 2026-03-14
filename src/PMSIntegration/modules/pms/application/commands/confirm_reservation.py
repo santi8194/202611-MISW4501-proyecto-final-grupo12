@@ -26,29 +26,11 @@ class ConfirmReservation:
                 "current_reservation_id": existing_reservation.reservation_id,
             }
 
-        existing_room_reservation = self.repository.obtain_by_room_id(id_habitacion)
-        print(f"[PMS] Checking existing reservation for room {id_habitacion}: {'Found' if existing_room_reservation else 'Not found'}")
-
-        if existing_room_reservation and existing_room_reservation.state != "CANCELLED":
-            print(f"[PMS] Room {id_habitacion} is already booked for reservation {existing_room_reservation.reservation_id}")
-            event = PMSReservationFailed(
-                id_reserva,
-                "Room is already booked"
-            )
-            self.event_bus.publish_event(
-                event.routing_key,
-                event.type,
-                event.to_dict()
-            )
-            return {
-                "message": "Room is already booked",
-                "state": existing_room_reservation.state
-            }
-
+        # La validacion de habitacion ocupada ahora la hace el PK de la BD (room_id + fecha_reserva)
+        # pero mantenemos el sleep para simular latencia y forzar colisiones en los tests.
         time.sleep(0.5)
 
         try:
-
             pmsReservation = Reservation.create(
                 id_reserva,
                 id_habitacion,
@@ -60,37 +42,51 @@ class ConfirmReservation:
 
             self.repository.save(pmsReservation)
 
-            event = PMSReservationConfirmed(
-                pmsReservation.id,
-                pmsReservation.reservation_id
+            # 4. Generar evento de éxito
+            pms_event = PMSReservationConfirmed(
+                pms_id=pmsReservation.id,
+                reservation_id=id_reserva,
+                fecha_reserva=fecha_reserva
             )
+            self.event_bus.publish_event(
+                routing_key=pms_event.routing_key,
+                event_type=pms_event.type,
+                payload=pms_event.to_dict()
+            )
+
+            return pms_event.to_dict()
 
         except IntegrityError:
             print(f"[PMS] IntegrityError caught for room {id_habitacion} on {fecha_reserva}. Overbooking avoided.")
-            event = PMSReservationFailed(
-                id_reserva,
-                "Protección contra overbooking activada (UniqueConstraint). Habitación ya tomada para esa fecha."
+            
+            pms_event = PMSReservationFailed(
+                reservation_id=id_reserva,
+                reason="Protección contra overbooking: Habitación ya reservada para esta fecha.",
+                fecha_reserva=fecha_reserva
             )
         except StaleDataError:
             print(f"[PMS] StaleDataError caught for room {id_habitacion}. Overbooking avoided.")
-            event = PMSReservationFailed(
-                id_reserva,
-                "Protección contra overbooking activada (Bloqueo Optimista). Habitación ya tomada."
+            pms_event = PMSReservationFailed(
+                reservation_id=id_reserva,
+                reason="Protección contra overbooking: Habitación ya reservada para esta fecha (Lock Optimista).",
+                fecha_reserva=fecha_reserva
             )
         except Exception as e:
-            event = PMSReservationFailed(
-                id_reserva,
-                str(e)
+            print(f"[PMS] Error inesperado en PMS: {str(e)}")
+            pms_event = PMSReservationFailed(
+                reservation_id=id_reserva,
+                reason=str(e),
+                fecha_reserva=fecha_reserva
             )
 
+        # Publicar el evento de fallo
         self.event_bus.publish_event(
-            event.routing_key,
-            event.type,
-            event.to_dict()
+            routing_key=pms_event.routing_key,
+            event_type=pms_event.type,
+            payload=pms_event.to_dict()
         )
 
         return {
-            "event_generated": event.type,
-            "pmscode": pmsReservation.id if 'pmsReservation' in locals()
-            else f"No reservation created - {event.reason}"
+            "event_generated": pms_event.type,
+            "motivo": pms_event.reason
         }
