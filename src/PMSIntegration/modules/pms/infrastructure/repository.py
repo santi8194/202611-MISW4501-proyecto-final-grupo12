@@ -7,13 +7,18 @@ class ReservationRepository:
 
     def save(self, reservation):
         """
-        Persiste la reserva en la base de datos. 
-        Utiliza control de persistencia optimista a través de la columna 'version'.
-        Si otra transacción modificó el registro entre la lectura y la escritura, 
-        SQLAlchemy lanzará una StaleDataError.
+        Persiste una NUEVA reserva en la base de datos.
+
+        Estrategia de concurrencia (doble capa):
+        1. Pre-validación (aplicación): obtain_active_by_room_and_date() rechaza
+           el intento si ya existe una reserva ACTIVA para (room_id, fecha_reserva).
+           Permite acumular N registros CANCELLED en la misma fecha y habitación.
+        2. Índice único parcial (PostgreSQL): capa de seguridad final que bloquea
+           atómicamente cualquier INSERT que viole la regla. Elimina TOCTOU.
+           Definido en models.py: UNIQUE(room_id, fecha_reserva) WHERE state != 'CANCELLED'.
+        3. Bloqueo Optimista (version): protege UPDATEs concurrentes al mismo registro.
         """
         db: Session = SessionLocal()
-
         model = ReservationModel(
             id=reservation.id,
             reservation_id=reservation.reservation_id,
@@ -23,14 +28,12 @@ class ReservationRepository:
             hotel_id=reservation.hotel_id,
             fecha_reserva=reservation.fecha_reserva,
             state=reservation.state,
-            # La versión es manejada por el Agregado de Dominio e incrementada por SQLAlchemy
-            version=reservation.version 
+            version=reservation.version
         )
-
         try:
-            # merge() sincroniza el estado del objeto con la sesión, disparando
-            # la validación de versión si el registro ya existe.
-            db.merge(model)
+            # add() porque es siempre un INSERT nuevo (UUID único por reserva).
+            # merge() haría upsert sobre el PK, lo cual no es el comportamiento deseado.
+            db.add(model)
             db.commit()
         except Exception:
             db.rollback()

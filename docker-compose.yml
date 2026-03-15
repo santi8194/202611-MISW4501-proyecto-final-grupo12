@@ -139,10 +139,36 @@ services:
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest
+      - PMS_DB_USER=pms_user
+      - PMS_DB_PASSWORD=pms_password
+      - PMS_DB_HOST=pms-db
+      - PMS_DB_PORT=5432
+      - PMS_DB_NAME=pms_db
     depends_on:
-      - rabbitmq-broker
+      pms-db:
+        condition: service_healthy
+      rabbitmq-broker:
+        condition: service_started
     networks:
       - microservices-network
+
+  pms-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pms_user
+      POSTGRES_PASSWORD: pms_password
+      POSTGRES_DB: pms_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pms_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U pms_user -d pms_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   payments-api:
     build:
@@ -165,3 +191,4 @@ networks:
 
 volumes:
   booking_db_data:
+  pms_db_data:
