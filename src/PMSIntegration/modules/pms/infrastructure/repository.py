@@ -41,6 +41,37 @@ class ReservationRepository:
         finally:
             db.close()
 
+    def update(self, reservation):
+        """
+        Actualiza el estado de una reserva EXISTENTE en la base de datos.
+        Usado para cambios de estado como CONFIRMED -> CANCELLED.
+        Usa merge() para sincronizar el objeto con la sesión y hacer el UPDATE.
+        La columna 'version' activa el Bloqueo Optimista: si el registro fue
+        modificado por otra transacción concurrente, SQLAlchemy lanzará StaleDataError.
+        """
+        db: Session = SessionLocal()
+        model = ReservationModel(
+            id=reservation.id,
+            reservation_id=reservation.reservation_id,
+            room_id=reservation.room_id,
+            room_type=reservation.room_type,
+            guest_name=reservation.guest_name,
+            hotel_id=reservation.hotel_id,
+            fecha_reserva=reservation.fecha_reserva,
+            state=reservation.state,
+            version=reservation.version
+        )
+        try:
+            # merge() hace el UPDATE sobre el registro existente identificado por el PK (id).
+            # Si la versión no coincide, SQLAlchemy lanza StaleDataError (Optimistic Locking).
+            db.merge(model)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     def obtain_by_room_id(self, room_id):
         """
         Busca reservas por habitación. 

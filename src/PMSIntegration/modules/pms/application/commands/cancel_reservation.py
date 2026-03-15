@@ -19,7 +19,9 @@ class CancelReservation:
 
         reservation.state = "CANCELLED"
 
-        self.repository.save(reservation)
+        # update() hace un UPDATE sobre la fila existente.
+        # save() haría un INSERT (nuevo registro), que no es lo que queremos aquí.
+        self.repository.update(reservation)
 
         event = PMSReservationCancelled(
             reservation.reservation_id,
