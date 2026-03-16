@@ -128,8 +128,24 @@ class OrquestadorSagaReservas:
                     if saga.historial:
                         monto_ctx = saga.historial[0].payload_snapshot.get('monto')
                     if monto_ctx is None:
-                        raise ValueError(f"Falta 'monto' en la historia de la saga para el comando {comando_nombre}")
+                        raise ValueError(f"Falta 'monto' en la historia de la saga for the command {comando_nombre}")
                     kwargs_filtrados['monto'] = float(monto_ctx)
+
+                if 'fecha_reserva' in parametros_validos and 'fecha_reserva' not in kwargs_filtrados:
+                    # Intentar buscar en TODO el historial de la saga empezando por el evento inicial (ReservaCreada)
+                    fecha_ctx = None
+                    if saga.historial:
+                        for log in saga.historial:
+                            if log.payload_snapshot and log.payload_snapshot.get('fecha_reserva'):
+                                fecha_ctx = log.payload_snapshot.get('fecha_reserva')
+                                break
+                    
+                    if not fecha_ctx:
+                         # Fallback temporal con advertencia en logs
+                         print(f"⚠️ [Orquestador] ADVERTENCIA: No se encontró 'fecha_reserva' en ninguna parte de la historia para {comando_nombre}.")
+                         fecha_ctx = "2026-03-14"
+                    
+                    kwargs_filtrados['fecha_reserva'] = fecha_ctx
                         
                 # Registrar el comando emitido CON los parametros correctos inyectados
                 payload_final_log = kwargs_filtrados.copy()
@@ -149,7 +165,7 @@ class OrquestadorSagaReservas:
                 print(f"[Orquestador] Comando Externo {comando_nombre} emitido para reserva {id_reserva}")
                 self.uow.commit()
 
-    def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float, id_habitacion: uuid.UUID = None):
+    def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float, id_habitacion: uuid.UUID = None, fecha_reserva: str = None):
         """Invocado cuando la reserva inicial pasa a PENDIENTE"""
         try:
             with self.uow:
@@ -173,10 +189,16 @@ class OrquestadorSagaReservas:
                 
                 paso_inicial = pasos[0]
 
-                # Registramos el evento inicial (para que en reversa se compense primero o al final)
-                payload_inicial = {"id_reserva": str(id_reserva), "monto": monto, "id_usuario": str(id_usuario)}
-                if id_habitacion:
-                    payload_inicial["id_habitacion"] = str(id_habitacion)
+                # Registramos el evento inicial usando el mismo formato que el schema de integracion
+                payload_inicial = {
+                    "id_reserva": str(id_reserva), 
+                    "id_usuario": str(id_usuario),
+                    "id_habitacion": str(id_habitacion) if id_habitacion else None,
+                    "monto": float(monto), 
+                    "fecha_reserva": fecha_reserva,
+                    "estado": "PENDIENTE",
+                    "fecha_creacion": str(saga.fecha_creacion)
+                }
                 saga.avanzar_paso(paso_inicial.index, "ReservaCreadaIntegracionEvt", payload_inicial)
 
                 # Avanzamos al paso 1 inmediatamente
@@ -220,7 +242,7 @@ class OrquestadorSagaReservas:
             paso_fallido = self._obtener_paso_por_error(saga.id_flujo, saga.version_ejecucion, evento_recibido)
             if paso_fallido:
                 print(f"[Orquestador Agnostico] 🚨 Evento de error detectado: {evento_recibido}. Desviando a compensación.")
-                self.compensar_saga(id_reserva, evento_recibido)
+                self.compensar_saga(id_reserva, evento_recibido, payload_recibido)
                 return
 
             # Buscar en el routing slip (base de datos) qué paso produjo este evento como ÉXITO
@@ -259,7 +281,7 @@ class OrquestadorSagaReservas:
             self.repositorio.actualizar(saga)
             self.uow.commit()
 
-    def compensar_saga(self, id_reserva: uuid.UUID, evento_fallo: str):
+    def compensar_saga(self, id_reserva: uuid.UUID, evento_fallo: str, payload_fallo: dict = None):
         """El motor LIFO que revierte la transacción distribuida leyendo de los pasos parametrizados"""
         with self.uow:
             saga = self.repositorio.buscar_por_reserva(str(id_reserva))
@@ -270,7 +292,7 @@ class OrquestadorSagaReservas:
                 return
 
             print(f"\n[ORQUESTADOR-FALLO] Iniciando compensación para reserva {id_reserva}. Evento fallo reportado: {evento_fallo}")
-            saga.iniciar_compensacion(evento_fallo, f"Fallo reportado: {evento_fallo}")
+            saga.iniciar_compensacion(evento_fallo, payload_original=payload_fallo)
             comandos_compensatorios = []
             
             # Buscar si el evento_fallo coincide con un 'error' esperado en la definición

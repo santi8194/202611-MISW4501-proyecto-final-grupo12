@@ -9,18 +9,23 @@ class CancelReservation:
 
     def execute(self, reservation_id):
 
-        reservation = self.repository.obtain_by_id(reservation_id)
+        reservation = self.repository.obtain_by_reservation_id(reservation_id)
 
         if not reservation:
             return {"message": "Reservation not found"}
+        
+        if reservation.state == "CANCELLED":
+            return {"message": "Reservation is already cancelled"}
 
         reservation.state = "CANCELLED"
 
-        self.repository.save(reservation)
+        # update() hace un UPDATE sobre la fila existente.
+        # save() haría un INSERT (nuevo registro), que no es lo que queremos aquí.
+        self.repository.update(reservation)
 
         event = PMSReservationCancelled(
-            reservation.id,
-            reservation.booking_id
+            reservation.reservation_id,
+            reservation.room_id
         )
 
         self.event_bus.publish_event(

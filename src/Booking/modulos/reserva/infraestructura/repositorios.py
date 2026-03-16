@@ -14,6 +14,7 @@ class RepositorioReservas(Repositorio):
             id_usuario=str(entidad.id_usuario),
             id_habitacion=str(entidad.id_habitacion),
             monto=entidad.monto,
+            fecha_reserva=entidad.fecha_reserva,
             estado=entidad.estado.value,
             fecha_creacion=entidad.fecha_creacion,
             fecha_actualizacion=entidad.fecha_actualizacion
@@ -27,6 +28,7 @@ class RepositorioReservas(Repositorio):
             # Actualizamos las propiedades que pueden cambiar
             reserva_dto.estado = entidad.estado.value
             reserva_dto.fecha_actualizacion = entidad.fecha_actualizacion
+            reserva_dto.fecha_reserva = entidad.fecha_reserva
             # La base de datos guarda los cambios cuando se llama a uow.commit()
 
     def eliminar(self, entidad_id: str):
@@ -43,6 +45,7 @@ class RepositorioReservas(Repositorio):
             id_usuario=uuid.UUID(reserva_dto.id_usuario),
             id_habitacion=uuid.UUID(reserva_dto.id_habitacion),
             monto=reserva_dto.monto,
+            fecha_reserva=reserva_dto.fecha_reserva,
             estado=EstadoReserva(reserva_dto.estado),
             fecha_creacion=reserva_dto.fecha_creacion,
             fecha_actualizacion=reserva_dto.fecha_actualizacion
@@ -58,6 +61,7 @@ class RepositorioReservas(Repositorio):
                 id_usuario=uuid.UUID(dto.id_usuario),
                 id_habitacion=uuid.UUID(dto.id_habitacion),
                 monto=dto.monto,
+                fecha_reserva=dto.fecha_reserva,
                 estado=EstadoReserva(dto.estado),
                 fecha_creacion=dto.fecha_creacion,
                 fecha_actualizacion=dto.fecha_actualizacion

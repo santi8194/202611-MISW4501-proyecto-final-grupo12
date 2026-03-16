@@ -16,7 +16,9 @@ class IniciarSagaHandler(Handler):
         self.orquestador.iniciar_saga(
             id_reserva=evento.id_reserva,
             id_usuario=evento.id_usuario,
-            monto=evento.monto
+            monto=evento.monto,
+            id_habitacion=evento.id_habitacion,
+            fecha_reserva=evento.fecha_reserva
         )
 
 class RespuestaSagaHandler(Handler):

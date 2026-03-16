@@ -1,22 +1,30 @@
 import json
 from config.rabbitmq import create_connection
 
-from modules.pms.infrastructure.services.handlers import handle_confirm_reservation
+from modules.pms.infrastructure.services.handlers import handle_confirm_reservation, handle_cancel_reservation
 
 COMMANDS_EXCHANGE = "travelhub.commands.exchange"
 QUEUE_NAME = "pms.commands.queue"
-ROUTING_KEY = "cmd.pms.confirmar-reserva"
+ROUTING_KEY_CONFIRM = "cmd.pms.confirmar-reserva"
+ROUTING_KEY_CANCEL = "cmd.pms.cancelar-reserva"
 
 
 def callback(ch, method, properties, body):
 
     data = json.loads(body.decode())
 
-    print("Comando recibido:", data)
-
+    print("[PMS] Command received:", data)
+    print("[PMS] Routing key:", method.routing_key)
     try:
 
-        handle_confirm_reservation(data)
+        if method.routing_key == "cmd.pms.confirmar-reserva":
+            handle_confirm_reservation(data)
+
+        elif method.routing_key == "cmd.pms.cancelar-reserva":
+            handle_cancel_reservation(data)
+
+        else:
+            print("Comando no reconocido")
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -46,7 +54,13 @@ def start_consumer():
     channel.queue_bind(
         exchange=COMMANDS_EXCHANGE,
         queue=QUEUE_NAME,
-        routing_key=ROUTING_KEY
+        routing_key=ROUTING_KEY_CONFIRM
+    )
+
+    channel.queue_bind(
+        exchange=COMMANDS_EXCHANGE,
+        queue=QUEUE_NAME,
+        routing_key=ROUTING_KEY_CANCEL
     )
 
     channel.basic_consume(

@@ -17,14 +17,16 @@ class Reserva(AgregacionRaiz):
     id_usuario: uuid.UUID = field(default=None)
     id_habitacion: uuid.UUID = field(default=None)
     monto: float = field(default=0.0)
+    fecha_reserva: str = field(default=None)
     estado: EstadoReserva = field(default=EstadoReserva.HOLD)
     fecha_creacion: datetime.datetime = field(default_factory=datetime.datetime.now)
     fecha_actualizacion: datetime.datetime = field(default_factory=datetime.datetime.now)
 
-    def iniciar_reserva_hold(self, id_usuario: uuid.UUID, id_habitacion: uuid.UUID, monto: float):
+    def iniciar_reserva_hold(self, id_usuario: uuid.UUID, id_habitacion: uuid.UUID, monto: float, fecha_reserva: str = None):
         self.id_usuario = id_usuario
         self.id_habitacion = id_habitacion
         self.monto = monto
+        self.fecha_reserva = fecha_reserva
         self.estado = EstadoReserva.HOLD
         self.fecha_creacion = datetime.datetime.now()
         self.fecha_actualizacion = self.fecha_creacion
@@ -35,6 +37,7 @@ class Reserva(AgregacionRaiz):
             id_usuario=self.id_usuario,
             id_habitacion=self.id_habitacion,
             monto=self.monto,
+            fecha_reserva=self.fecha_reserva,
             fecha_creacion=self.fecha_creacion
         ))
 
@@ -62,7 +65,8 @@ class Reserva(AgregacionRaiz):
             id_reserva=self.id,
             id_usuario=self.id_usuario,
             id_habitacion=self.id_habitacion,
-            monto=self.monto
+            monto=self.monto,
+            fecha_reserva=self.fecha_reserva
         ))
 
     def confirmar_reserva(self):

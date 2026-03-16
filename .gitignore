@@ -55,3 +55,4 @@ src/aeroalpes
 src/Booking/compile_files.py
 src/Booking/contents_summary.txt
 experimento/
+data/

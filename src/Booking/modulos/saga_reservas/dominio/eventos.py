@@ -13,6 +13,7 @@ class ProcesarPagoCmd(Comando):
 class ConfirmarReservaPmsCmd(Comando):
     id_reserva: uuid.UUID
     id_habitacion: uuid.UUID
+    fecha_reserva: str = None
 
 # --- COMANDOS: Compensación (Rollback LIFO) ---
 @dataclass

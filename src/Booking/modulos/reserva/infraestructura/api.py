@@ -11,15 +11,26 @@ reserva_api = Blueprint('reserva_api', __name__)
 def iniciar_reserva_hold():
     try:
         data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validar campos obligatorios
+        campos_obligatorios = ['id_usuario', 'id_habitacion', 'monto', 'fecha_reserva']
+        for campo in campos_obligatorios:
+            if campo not in data or data[campo] is None:
+                return jsonify({"error": f"El campo '{campo}' es obligatorio"}), 400
+
         # Convertimos los strings a UUIDs
         id_usuario = uuid.UUID(data.get('id_usuario'))
         id_habitacion = uuid.UUID(data.get('id_habitacion'))
         monto = float(data.get('monto'))
+        fecha_reserva = data.get('fecha_reserva') # Expected YYYY-MM-DD
 
         comando = CrearReservaHold(
             id_usuario=id_usuario,
             id_habitacion=id_habitacion,
-            monto=monto
+            monto=monto,
+            fecha_reserva=fecha_reserva
         )
 
         uow = UnidadTrabajoHibrida()

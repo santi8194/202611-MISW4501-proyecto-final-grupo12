@@ -7,10 +7,12 @@ class CrearReservaHold(Comando):
     id_usuario: uuid.UUID
     id_habitacion: uuid.UUID
     monto: float
+    fecha_reserva: str = None
 
 @dataclass
 class FormalizarReserva(Comando):
     id_reserva: uuid.UUID
+    fecha_reserva: str = None
 
 @dataclass
 class ConfirmarReservaLocalCmd(Comando):
