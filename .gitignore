@@ -56,3 +56,20 @@ src/Booking/compile_files.py
 src/Booking/contents_summary.txt
 experimento/
 data/
+
+
+
+# Terraform
+.terraform/
+*.tfplan
+*.tfstate.lock.*
+*.tfstate.backup
+*.tfstate
+crash.log
+crash.*.log
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
