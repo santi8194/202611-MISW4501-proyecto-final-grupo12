@@ -1,0 +1,16 @@
+project_name = "travelhub"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# TODO [M1]: valores de red/seguridad
+# TODO [M2]: imagenes ECS y Lambda, autoscaling
+# TODO [M3]: tamanos de RDS/MQ/OpenSearch, protecciones y costos
+
+# TODO [CI/CD]: valores DevOps
+# enable_cicd               = true
+# source_provider           = "codestar"
+# repository_owner          = "tu-org"
+# repository_name           = "tu-repo"
+# repository_branch         = "main"
+# codestar_connection_arn   = "arn:aws:codestar-connections:..."
+# enable_manual_approval_prod = true
