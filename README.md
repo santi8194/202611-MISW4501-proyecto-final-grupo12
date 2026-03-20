@@ -64,3 +64,35 @@ terraform -chdir="$PWD\terraform\stacks\container_registry" destroy -var-file="$
 - Cada ambiente usa su propio archivo backend.tfvars para aislar el estado.
 - Las variables del entorno se definen en terraform.tfvars.
 - Se recomienda no subir archivos .tfstate al repositorio.
+
+# CLUSTER EKS
+
+terraform -chdir="$PWD\terraform\stacks\eks" init -backend-config="$PWD\terraform\environments\dev\eks\backend.tfvars"
+terraform -chdir="$PWD\terraform\stacks\eks" plan -var-file="$PWD\terraform\environments\dev\eks\terraform.tfvars"
+terraform -chdir="$PWD\terraform\stacks\eks" apply -var-file="$PWD\terraform\environments\dev\eks\terraform.tfvars"
+
+## Destry para que no genere cobros
+
+terraform -chdir="$PWD\terraform\stacks\eks" destroy -var-file="$PWD\terraform\environments\dev\eks\terraform.tfvars"
+
+
+# Imagen Booking
+Img:
+docker build -t booking:1.0.0 ./src/Booking
+Tag:
+docker tag booking:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
+Push
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
+
+# Coenctar desde kubectl
+
+aws eks update-kubeconfig --region us-east-1 --name grupo12-travelhub-eks
+
+
+## Desplegar Booking
+kubectl apply -f ./src/ks8/aws/booking-deployment.yaml
+kubectl apply -f ./src/ks8/aws/booking-service.yaml
+
+
+# Vuelve a loguear
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 962273458546.dkr.ecr.us-east-1.amazonaws.com

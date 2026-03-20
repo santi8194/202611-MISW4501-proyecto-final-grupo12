@@ -16,7 +16,8 @@ def create_app(config_name=None):
         database_uri = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
     else:
         db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'database', 'booking.db'))
-        database_uri = f'sqlite:///{db_path}'
+        #database_uri = f'sqlite:///{db_path}'
+        database_uri = "sqlite:///:memory:"
 
     app.config.from_mapping(
         SECRET_KEY='dev',

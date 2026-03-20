@@ -30,7 +30,8 @@ def get_db_session():
         connection_url = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
     else:
         db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'database', 'booking.db'))
-        connection_url = f'sqlite:///{db_path}'
+        # connection_url = f'sqlite:///{db_path}'
+        connection_url = "sqlite:///:memory:"
         
     engine = create_engine(connection_url)
     Session = sessionmaker(bind=engine)
