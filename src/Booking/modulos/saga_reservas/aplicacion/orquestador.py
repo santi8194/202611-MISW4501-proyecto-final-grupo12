@@ -31,12 +31,12 @@ class OrquestadorSagaReservas:
                  handler_confirmar_local=None, handler_cancelar_local=None):
         self.repositorio = repositorio
         self.uow = uow
-        # Handlers locales inyectados para evitar imports cruzados en tiempo de ejecución
+        # Handlers locales inyectados para evitar construcción inline de objetos de otro Bounded Context
         self._handler_confirmar_local = handler_confirmar_local
         self._handler_cancelar_local = handler_cancelar_local
 
     def _get_handler_confirmar_local(self):
-        """Lazy-init del handler de confirmación si no fue inyectado."""
+        """Lazy-init: crea el handler de confirmación local si no fue inyectado externamente."""
         if not self._handler_confirmar_local:
             from Booking.modulos.reserva.aplicacion.handlers import ConfirmarReservaLocalHandler
             from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
@@ -46,7 +46,7 @@ class OrquestadorSagaReservas:
         return self._handler_confirmar_local
 
     def _get_handler_cancelar_local(self):
-        """Lazy-init del handler de cancelación si no fue inyectado."""
+        """Lazy-init: crea el handler de cancelación local si no fue inyectado externamente."""
         if not self._handler_cancelar_local:
             from Booking.modulos.reserva.aplicacion.handlers import CancelarReservaLocalHandler
             from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
@@ -358,7 +358,9 @@ class OrquestadorSagaReservas:
                             kwargs_log["id_habitacion"] = str(habitacion)
                         elif ClaseCompensacion == CancelarReservaLocalCmd:
                             logger.info(f"[Orquestador-Fallo] Delegando compensación local al handler inyectado: CancelarReservaLocalCmd")
-                            self._get_handler_cancelar_local().handle(CancelarReservaLocalCmd(id_reserva=id_reserva))
+                            self._get_handler_cancelar_local().handle(
+                                CancelarReservaLocalCmd(id_reserva=id_reserva)
+                            )
                         
                         saga.registrar_comando_emitido(ClaseCompensacion.__name__, kwargs_log)
 
