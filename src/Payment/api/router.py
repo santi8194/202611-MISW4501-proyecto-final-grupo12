@@ -28,3 +28,8 @@ def procesar_pago(request: PaymentRequest):
 def refund_payment(request: RefundRequest):
     command = RefundPayment(repository, event_bus)
     return command.execute(request.id_pago)
+
+
+@router.get("/health")
+def health():
+    return {"status": "Payment Service running"}

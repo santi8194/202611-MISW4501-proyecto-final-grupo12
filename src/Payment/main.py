@@ -1,3 +1,4 @@
+import os
 import threading
 
 from config.app import create_app
@@ -11,6 +12,7 @@ Base.metadata.create_all(bind=engine)
 @app.on_event("startup")
 def start_rabbitmq_consumer():
 
-    thread = threading.Thread(target=start_consumer)
-    thread.daemon = True
-    thread.start()
+    if os.getenv("ENABLE_RABBIT", "false") == "true":
+        thread = threading.Thread(target=start_consumer)
+        thread.daemon = True
+        thread.start()

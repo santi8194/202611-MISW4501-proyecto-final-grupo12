@@ -80,17 +80,17 @@ terraform -chdir="$PWD\terraform\stacks\eks" destroy -var-file="$PWD\terraform\e
 Img:
 docker build -t booking:1.0.0 ./src/Booking
 Tag:
-docker tag booking:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
+docker tag booking:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.0
 Push
-docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.0
 
 # Imagen Notification
 Img:
 docker build -t notification:1.0.0 ./src/Notification
 Tag:
-docker tag notification:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
+docker tag notification:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/notification:1.0.0
 Push
-docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/notification:1.0.0
 
 # Coenctar desde kubectl
 
@@ -98,9 +98,12 @@ aws eks update-kubeconfig --region us-east-1 --name grupo12-travelhub-eks
 
 
 ## Desplegar Booking
-kubectl apply -f ./src/k8s/aws/booking-deployment.yaml
-kubectl apply -f ./src/k8s/aws/booking-service.yaml
+kubectl apply -f ./k8s/aws/booking-deployment.yaml
+kubectl apply -f ./k8s/aws/booking-service.yaml
 
+## Desplegar Notification
+kubectl apply -f ./k8s/aws/notification-deployment.yaml
+kubectl apply -f ./k8s/aws/notification-service.yaml
 
 # Vuelve a loguear
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 962273458546.dkr.ecr.us-east-1.amazonaws.com
