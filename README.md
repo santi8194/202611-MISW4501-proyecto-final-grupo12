@@ -143,6 +143,21 @@ kubectl rollout restart deployment pmsintegration-deployment
 
 kubectl apply -f ./k8s/aws/partnermanagement-deployment.yaml
 kubectl apply -f ./k8s/aws/partnermanagement-service.yaml
+kubectl rollout restart deployment partnermanagement-deployment
 
 # Vuelve a loguear
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 962273458546.dkr.ecr.us-east-1.amazonaws.com
+
+
+# Ingress
+Se configuró un Ingress Controller (NGINX) en el cluster EKS para exponer todos los microservicios mediante una sola URL pública.
+
+kubectl apply -f ./src/k8s/aws/ingress.yaml
+kubectl get ingress
+
+URL: http://a27afd6e0e6414ee490e57d925fab93e-408326643.us-east-1.elb.amazonaws.com
+
+Probar:
+/pmsintegration/health
+/payment/health
+/notification/health
