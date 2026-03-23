@@ -45,24 +45,56 @@ class DespachadorRabbitMQ(Despachador):
         except Exception as e:
             print(f"[RabbitMQ] Error publicando mensaje: {e}")
 
+    ROUTING_REGISTRY = {
+        # Comandos
+        "ProcesarPagoCmd": ("travelhub.commands.exchange", "cmd.payment.procesar-pago"),
+        "ConfirmarReservaPmsCmd": ("travelhub.commands.exchange", "cmd.pms.confirmar-reserva"),
+        "SolicitarAprobacionManualCmd": ("travelhub.commands.exchange", "cmd.partnermanagement.solicitar-aprobacion"),
+        "ReversarPagoCmd": ("travelhub.commands.exchange", "cmd.payment.reversar-pago"),
+        "CancelarReservaPmsCmd": ("travelhub.commands.exchange", "cmd.pms.cancelar-reserva"),
+        
+        # Eventos
+        "ReservaCreadaIntegracionEvt": ("travelhub.events.exchange", "evt.reserva.creada"),
+        "ReservaPendiente": ("travelhub.events.exchange", "evt.reserva.pendiente"),
+        "PagoExitosoEvt": ("travelhub.events.exchange", "evt.pago.exitoso"),
+        "PagoRechazadoEvt": ("travelhub.events.exchange", "evt.pago.rechazado"),
+        "ConfirmacionPmsExitosaEvt": ("travelhub.events.exchange", "evt.pms.confirmacion_exitosa"),
+        "ReservaRechazadaPmsEvt": ("travelhub.events.exchange", "evt.pms.rechazada"),
+        "ReservaAprobadaManualEvt": ("travelhub.events.exchange", "evt.partnermanagement.aprobada"),
+        "ReservaRechazadaManualEvt": ("travelhub.events.exchange", "evt.partnermanagement.rechazada"),
+        "ReservaConfirmadaEvt": ("travelhub.events.exchange", "evt.reserva.confirmada"),
+        "VoucherEnviadoEvt": ("travelhub.events.exchange", "evt.voucher.enviado"),
+        "FalloEnvioVoucherEvt": ("travelhub.events.exchange", "evt.notification.fallo_envio"),
+    }
+
+    def _obtener_routing(self, tipo: str) -> tuple:
+        if tipo in self.ROUTING_REGISTRY:
+            return self.ROUTING_REGISTRY[tipo]
+        
+        # Fallbacks dinámicos
+        if "Cmd" in tipo or "EsperandoVoucher" in tipo:
+            if "LocalCmd" in tipo:
+                routing_key = f"cmd.booking.{tipo.lower()}"
+            else:
+                routing_key = f"cmd.generico.{tipo.lower()}"
+                print(f"[RabbitMQ] Advertencia: Tipo de comando '{tipo}' no mapeado formalmente. Usando '{routing_key}'")
+            return "travelhub.commands.exchange", routing_key
+            
+        if "Evt" in tipo or tipo == "ReservaPendiente":
+            routing_key = f"evt.generico.{tipo.lower()}"
+            print(f"[RabbitMQ] Advertencia: Tipo de evento '{tipo}' no mapeado formalmente. Usando '{routing_key}'")
+            return "travelhub.events.exchange", routing_key
+            
+        return "", ""
+
     def publicar_evento(self, evento, topico=""): 
         # El parámetro topico de la interfaz original ahora se ignora en pro del enrutamiento dinámico
         
         # Hack para comandos que fueron pasados como eventos
         tipo = getattr(evento, '__class__').__name__
         if "Cmd" in tipo or "EsperandoVoucher" in tipo:
-            exchange = "travelhub.commands.exchange"
-            routing_key = ""
-            if tipo == "ProcesarPagoCmd":
-                routing_key = "cmd.payment.procesar-pago"
-            elif tipo == "ConfirmarReservaPmsCmd":
-                routing_key = "cmd.pms.confirmar-reserva"
-            elif tipo == "SolicitarAprobacionManualCmd":
-                routing_key = "cmd.partnermanagement.solicitar-aprobacion"
-            elif tipo == "ReversarPagoCmd":
-                routing_key = "cmd.payment.reversar-pago"
-            elif tipo == "CancelarReservaPmsCmd":
-                routing_key = "cmd.pms.cancelar-reserva"
+            exchange, routing_key = self._obtener_routing(tipo)
+            
             import uuid
             class UUIDEncoder(json.JSONEncoder):
                 def default(self, obj):
@@ -77,64 +109,17 @@ class DespachadorRabbitMQ(Despachador):
                 payload = json.loads(json.dumps(evento, cls=UUIDEncoder))
                 
             print(f"[RabbitMQ] Publicando CMD mapeado directo: {tipo}")
-            self._publicar_mensaje(payload, exchange, tipo, routing_key)
+            if exchange and routing_key:
+                self._publicar_mensaje(payload, exchange, tipo, routing_key)
+            else:
+                print(f"[RabbitMQ] No se pudo determinar el routing para comando directo {tipo}")
             return
 
         evento_integracion = self._mapeador.entidad_a_dto(evento)
         
         if evento_integracion:
             tipo = evento_integracion.type
-            exchange = ""
-            routing_key = ""
-            
-            # Eventos
-            if "Evt" in tipo or tipo == "ReservaPendiente":
-                exchange = "travelhub.events.exchange"
-                if tipo == "ReservaCreadaIntegracionEvt":
-                    routing_key = "evt.reserva.creada"
-                elif tipo == "ReservaPendiente":
-                    routing_key = "evt.reserva.pendiente"
-                elif tipo == "PagoExitosoEvt":
-                    routing_key = "evt.pago.exitoso"
-                elif tipo == "PagoRechazadoEvt":
-                    routing_key = "evt.pago.rechazado"
-                elif tipo == "ConfirmacionPmsExitosaEvt":
-                    routing_key = "evt.pms.confirmacion_exitosa"
-                elif tipo == "ReservaRechazadaPmsEvt":
-                    routing_key = "evt.pms.rechazada"
-                elif tipo == "ReservaAprobadaManualEvt":
-                    routing_key = "evt.partnermanagement.aprobada"
-                elif tipo == "ReservaRechazadaManualEvt":
-                    routing_key = "evt.partnermanagement.rechazada"
-                elif tipo == "ReservaConfirmadaEvt":
-                    routing_key = "evt.reserva.confirmada"
-                elif tipo == "VoucherEnviadoEvt":
-                    routing_key = "evt.voucher.enviado"
-                elif tipo == "FalloEnvioVoucherEvt":
-                    routing_key = "evt.notification.fallo_envio"
-                else: 
-                     routing_key = f"evt.generico.{tipo.lower()}"
-                     print(f"[RabbitMQ] Advertencia: Tipo de evento '{tipo}' no mapeado formalmente. Usando '{routing_key}'")
-
-            # Comandos
-            elif "Cmd" in tipo or "EsperandoVoucher" in tipo:
-                exchange = "travelhub.commands.exchange"
-                if tipo == "ProcesarPagoCmd":
-                    routing_key = "cmd.payment.procesar-pago"
-                elif tipo == "ConfirmarReservaPmsCmd":
-                    routing_key = "cmd.pms.confirmar-reserva"
-                elif tipo == "SolicitarAprobacionManualCmd":
-                    routing_key = "cmd.partnermanagement.solicitar-aprobacion"
-                elif tipo == "ReversarPagoCmd":
-                    routing_key = "cmd.payment.reversar-pago"
-                elif tipo == "CancelarReservaPmsCmd":
-                    routing_key = "cmd.pms.cancelar-reserva"
-                # Comandos locales del Booking no deberían ir a rmq, pero si llegan por UOW...
-                elif "LocalCmd" in tipo: 
-                     routing_key = f"cmd.booking.{tipo.lower()}"
-                else:
-                    routing_key = f"cmd.generico.{tipo.lower()}"
-                    print(f"[RabbitMQ] Advertencia: Tipo de comando '{tipo}' no mapeado formalmente. Usando '{routing_key}'")
+            exchange, routing_key = self._obtener_routing(tipo)
             
             if exchange and routing_key:
                 self._publicar_mensaje(evento_integracion.to_dict(), exchange, tipo, routing_key)

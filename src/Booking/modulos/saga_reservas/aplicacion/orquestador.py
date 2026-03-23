@@ -4,9 +4,10 @@ from Booking.modulos.saga_reservas.infraestructura.repositorios import Repositor
 from Booking.config.uow import UnidadTrabajoHibrida
 from Booking.modulos.saga_reservas.dominio.eventos import (
     ProcesarPagoCmd, ConfirmarReservaPmsCmd, 
-    CancelarReservaPmsCmd, ReversarPagoCmd, CancelarReservaLocalCmd,
+    CancelarReservaPmsCmd, ReversarPagoCmd,
     SolicitarAprobacionManualCmd, MarcarSagaEsperandoVoucherCmd
 )
+from Booking.modulos.reserva.aplicacion.comandos import CancelarReservaLocalCmd
 import uuid
 import inspect
 
