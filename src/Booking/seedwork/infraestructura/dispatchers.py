@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import pika
 import json
 import os
@@ -40,10 +44,10 @@ class DespachadorRabbitMQ(Despachador):
                     type=tipo_evento
                 )
             )
-            print(f"[RabbitMQ] Evento/Comando Publicado en '{topico_exchange}' con routing key '{routing_key}': {tipo_evento}")
+            logger.info(f"[RabbitMQ] Evento/Comando Publicado en '{topico_exchange}' con routing key '{routing_key}': {tipo_evento}")
             connection.close()
         except Exception as e:
-            print(f"[RabbitMQ] Error publicando mensaje: {e}")
+            logger.info(f"[RabbitMQ] Error publicando mensaje: {e}")
 
     ROUTING_REGISTRY = {
         # Comandos
@@ -77,12 +81,12 @@ class DespachadorRabbitMQ(Despachador):
                 routing_key = f"cmd.booking.{tipo.lower()}"
             else:
                 routing_key = f"cmd.generico.{tipo.lower()}"
-                print(f"[RabbitMQ] Advertencia: Tipo de comando '{tipo}' no mapeado formalmente. Usando '{routing_key}'")
+                logger.info(f"[RabbitMQ] Advertencia: Tipo de comando '{tipo}' no mapeado formalmente. Usando '{routing_key}'")
             return "travelhub.commands.exchange", routing_key
             
         if "Evt" in tipo or tipo == "ReservaPendiente":
             routing_key = f"evt.generico.{tipo.lower()}"
-            print(f"[RabbitMQ] Advertencia: Tipo de evento '{tipo}' no mapeado formalmente. Usando '{routing_key}'")
+            logger.info(f"[RabbitMQ] Advertencia: Tipo de evento '{tipo}' no mapeado formalmente. Usando '{routing_key}'")
             return "travelhub.events.exchange", routing_key
             
         return "", ""
@@ -108,11 +112,11 @@ class DespachadorRabbitMQ(Despachador):
             else:
                 payload = json.loads(json.dumps(evento, cls=UUIDEncoder))
                 
-            print(f"[RabbitMQ] Publicando CMD mapeado directo: {tipo}")
+            logger.info(f"[RabbitMQ] Publicando CMD mapeado directo: {tipo}")
             if exchange and routing_key:
                 self._publicar_mensaje(payload, exchange, tipo, routing_key)
             else:
-                print(f"[RabbitMQ] No se pudo determinar el routing para comando directo {tipo}")
+                logger.info(f"[RabbitMQ] No se pudo determinar el routing para comando directo {tipo}")
             return
 
         evento_integracion = self._mapeador.entidad_a_dto(evento)
@@ -124,9 +128,9 @@ class DespachadorRabbitMQ(Despachador):
             if exchange and routing_key:
                 self._publicar_mensaje(evento_integracion.to_dict(), exchange, tipo, routing_key)
             else:
-                 print(f"[RabbitMQ] No se pudo determinar el routing para {tipo}")
+                 logger.info(f"[RabbitMQ] No se pudo determinar el routing para {tipo}")
         else:
-            print(f"[RabbitMQ] Evento de dominio {evento.__class__.__name__} fue ignorado (No tiene mapeo a Integración)")
+            logger.info(f"[RabbitMQ] Evento de dominio {evento.__class__.__name__} fue ignorado (No tiene mapeo a Integración)")
 
     def publicar_comando(self, comando, routing_key: str):
         # We enforce the new exchange here, although the routing_key is provided externally
@@ -151,10 +155,10 @@ class DespachadorRabbitMQ(Despachador):
                     delivery_mode=2,
                 )
             )
-            print(f"[RabbitMQ] Comando despachado directo a '{exchange}': {routing_key}")
+            logger.info(f"[RabbitMQ] Comando despachado directo a '{exchange}': {routing_key}")
             connection.close()
         except Exception as e:
-            print(f"[RabbitMQ] Error publicando comando directo: {e}")
+            logger.info(f"[RabbitMQ] Error publicando comando directo: {e}")
 
     def cerrar(self):
         # La conexión se cierra por mensaje, por lo que no hay una conexión persistente para cerrar aquí.

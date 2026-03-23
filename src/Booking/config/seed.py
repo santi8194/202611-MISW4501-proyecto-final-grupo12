@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from Booking.config.db import db
 from Booking.modulos.saga_reservas.infraestructura.dto import SagaDefinitionDTO, SagaStepsDefinitionDTO
 
@@ -25,4 +29,4 @@ def seed_saga_reservas():
         ]
         db.session.add_all(pasos)
         db.session.commit()
-        print("[Booking API] Configuración de Saga Orquestada insertada en BD exitosamente.")
+        logger.info("[Booking API] Configuración de Saga Orquestada insertada en BD exitosamente.")
