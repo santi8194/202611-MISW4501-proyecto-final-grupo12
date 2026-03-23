@@ -36,3 +36,8 @@ def cancel_reservation(request: CancelRequest):
     command = CancelReservation(repository, event_bus)
 
     return command.execute(request.id_reserva)
+
+
+@router.get("/health")
+def health():
+    return {"status": "Pmsintegration Service running"}

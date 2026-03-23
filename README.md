@@ -77,6 +77,7 @@ terraform -chdir="$PWD\terraform\stacks\eks" destroy -var-file="$PWD\terraform\e
 
 
 # Imagen Booking
+Repo: aws ecr create-repository --repository-name booking
 Img:
 docker build -t booking:1.0.0 ./src/Booking
 Tag:
@@ -85,6 +86,7 @@ Push
 docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.0
 
 # Imagen Notification
+Repo: aws ecr create-repository --repository-name notification
 Img:
 docker build -t notification:1.0.0 ./src/Notification
 Tag:
@@ -92,7 +94,20 @@ docker tag notification:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/notif
 Push
 docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/notification:1.0.0
 
-# Coenctar desde kubectl
+# Imagen Payment
+Repo: aws ecr create-repository --repository-name payment
+docker build --no-cache -t payment:1.0.4 ./src/Payment
+docker tag payment:1.0.4 962273458546.dkr.ecr.us-east-1.amazonaws.com/payment:1.0.4
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/payment:1.0.4
+
+# Imagen pmsintegration
+Repo: aws ecr create-repository --repository-name pmsintegration
+docker build -t pmsintegration:1.0.0 ./src/PMSintegration
+docker tag pmsintegration:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/pmsintegration:1.0.0
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/pmsintegration:1.0.0
+
+
+# Coenctar y Actualizar kubeconfig
 
 aws eks update-kubeconfig --region us-east-1 --name grupo12-travelhub-eks
 
@@ -104,6 +119,11 @@ kubectl apply -f ./k8s/aws/booking-service.yaml
 ## Desplegar Notification
 kubectl apply -f ./k8s/aws/notification-deployment.yaml
 kubectl apply -f ./k8s/aws/notification-service.yaml
+
+
+## Desplegar payment
+kubectl apply -f ./k8s/aws/payment-deployment.yaml
+kubectl apply -f ./k8s/aws/payment-service.yaml
 
 # Vuelve a loguear
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 962273458546.dkr.ecr.us-east-1.amazonaws.com
