@@ -6,8 +6,8 @@ from Booking.modulos.saga_reservas.dominio.entidades import SagaInstance
 from Booking.modulos.saga_reservas.dominio.objetos_valor import EstadoSaga, TipoMensajeSaga
 from Booking.modulos.saga_reservas.infraestructura.repositorios import RepositorioSagas
 from Booking.config.uow import UnidadTrabajoHibrida
-from Booking.modulos.saga_reservas.dominio.eventos import (
-    ProcesarPagoCmd, ConfirmarReservaPmsCmd, 
+from Booking.modulos.saga_reservas.dominio.comandos import (
+    ProcesarPagoCmd, ConfirmarReservaPmsCmd,
     CancelarReservaPmsCmd, ReversarPagoCmd,
     SolicitarAprobacionManualCmd, MarcarSagaEsperandoVoucherCmd
 )

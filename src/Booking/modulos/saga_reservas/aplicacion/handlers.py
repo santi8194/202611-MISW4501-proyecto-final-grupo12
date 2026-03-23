@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 
 from Booking.seedwork.aplicacion.comandos import Handler
 from Booking.modulos.reserva.dominio.eventos import ReservaPendiente
-from Booking.modulos.saga_reservas.dominio.eventos import PagoExitosoEvt, ConfirmacionPmsExitosaEvt, RechazarReservaCmd
+from Booking.modulos.saga_reservas.dominio.comandos import RechazarReservaCmd
 from Booking.modulos.saga_reservas.aplicacion.orquestador import OrquestadorSagaReservas
 
 class IniciarSagaHandler(Handler):
