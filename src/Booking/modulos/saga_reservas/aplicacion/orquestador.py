@@ -27,9 +27,33 @@ DIR_COMANDOS = {
 }
 
 class OrquestadorSagaReservas:
-    def __init__(self, repositorio: RepositorioSagas, uow: UnidadTrabajoHibrida):
+    def __init__(self, repositorio: RepositorioSagas, uow: UnidadTrabajoHibrida,
+                 handler_confirmar_local=None, handler_cancelar_local=None):
         self.repositorio = repositorio
         self.uow = uow
+        # Handlers locales inyectados para evitar imports cruzados en tiempo de ejecución
+        self._handler_confirmar_local = handler_confirmar_local
+        self._handler_cancelar_local = handler_cancelar_local
+
+    def _get_handler_confirmar_local(self):
+        """Lazy-init del handler de confirmación si no fue inyectado."""
+        if not self._handler_confirmar_local:
+            from Booking.modulos.reserva.aplicacion.handlers import ConfirmarReservaLocalHandler
+            from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
+            self._handler_confirmar_local = ConfirmarReservaLocalHandler(
+                repositorio=RepositorioReservas(), uow=self.uow
+            )
+        return self._handler_confirmar_local
+
+    def _get_handler_cancelar_local(self):
+        """Lazy-init del handler de cancelación si no fue inyectado."""
+        if not self._handler_cancelar_local:
+            from Booking.modulos.reserva.aplicacion.handlers import CancelarReservaLocalHandler
+            from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
+            self._handler_cancelar_local = CancelarReservaLocalHandler(
+                repositorio=RepositorioReservas(), uow=self.uow
+            )
+        return self._handler_cancelar_local
 
     def _obtener_paso_actual(self, id_flujo: str, version: int, evento_disparador: str):
         pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
@@ -63,43 +87,28 @@ class OrquestadorSagaReservas:
         
         if comando_nombre == "ConfirmarReservaLocalCmd":
             saga.registrar_comando_emitido(comando_nombre, payload_registro)
-            logger.info(f"[Orquestador] Interceptando Comando Local: {comando_nombre}. Procesando en memoria.")
-            
-            from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
-            from Booking.config.db import db
-            
-            repo_reservas = RepositorioReservas()
-            reserva = repo_reservas.obtener_por_id(str(id_reserva))
-            
-            if reserva:
-                from Booking.modulos.reserva.dominio.eventos import ReservaConfirmadaEvt
-                from datetime import datetime
-                
-                reserva.confirmar_reserva()
-                reserva.eventos.clear()
-                evento_local = ReservaConfirmadaEvt(id_reserva=reserva.id, fecha_actualizacion=datetime.now())
-                reserva.agregar_evento(evento_local)
-                
-                repo_reservas.actualizar(reserva)
-                self.uow.agregar_eventos(reserva.eventos)
-                
-                logger.info(f"✅ [ORQUESTADOR -> LOCAL] Reserva {reserva.id} CONFIRMADA localmente en BD.")
-                
-                # Avanzamos al siguiente paso informando que ya lo hicimos
+            logger.info(f"[Orquestador] Delegando Comando Local: {comando_nombre} al handler inyectado.")
+
+            from Booking.modulos.reserva.aplicacion.comandos import ConfirmarReservaLocalCmd
+            evento_confirmado = self._get_handler_confirmar_local().handle(
+                ConfirmarReservaLocalCmd(id_reserva=id_reserva)
+            )
+
+            if evento_confirmado:
+                logger.info(f"✅ [ORQUESTADOR -> LOCAL] Reserva {id_reserva} CONFIRMADA localmente en BD.")
                 saga.avanzar_paso(siguiente_paso.index, "ReservaConfirmadaEvt", {"id_reserva": str(id_reserva)})
-                
-                # Revisar si la saga completó el happy path local e instigarlo a continuar
+
                 paso_final = next((p for p in pasos if p.index == siguiente_paso.index + 1), None)
                 if paso_final:
-                     saga.estado_global = EstadoSaga.EN_PROCESO
-                     self._procesar_siguiente_comando(
-                         saga=saga,
-                         pasos=pasos,
-                         siguiente_paso=paso_final,
-                         id_reserva=id_reserva,
-                         kwargs_comando={},
-                         payload_registro={}
-                     )
+                    saga.estado_global = EstadoSaga.EN_PROCESO
+                    self._procesar_siguiente_comando(
+                        saga=saga,
+                        pasos=pasos,
+                        siguiente_paso=paso_final,
+                        id_reserva=id_reserva,
+                        kwargs_comando={},
+                        payload_registro={}
+                    )
                 else:
                     saga.estado_global = EstadoSaga.COMPLETADA
             else:
@@ -348,16 +357,8 @@ class OrquestadorSagaReservas:
                             comandos_compensatorios.append(cmd)
                             kwargs_log["id_habitacion"] = str(habitacion)
                         elif ClaseCompensacion == CancelarReservaLocalCmd:
-                            logger.info(f"[Orquestador-Fallo] Interceptando Comando Local para Compensación: CancelarReservaLocalCmd")
-                            from Booking.modulos.reserva.aplicacion.handlers import CancelarReservaLocalHandler
-                            from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
-                            
-                            handler_local_fallo = CancelarReservaLocalHandler(
-                                repositorio=RepositorioReservas(), 
-                                uow=self.uow
-                            )
-                            # Ejecuta el borrado local sincrónicamente:
-                            evento_falla = handler_local_fallo.handle(CancelarReservaLocalCmd(id_reserva=id_reserva))
+                            logger.info(f"[Orquestador-Fallo] Delegando compensación local al handler inyectado: CancelarReservaLocalCmd")
+                            self._get_handler_cancelar_local().handle(CancelarReservaLocalCmd(id_reserva=id_reserva))
                         
                         saga.registrar_comando_emitido(ClaseCompensacion.__name__, kwargs_log)
 
