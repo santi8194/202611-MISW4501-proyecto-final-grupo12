@@ -8,4 +8,4 @@ ENV FLASK_APP=api
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["uvicorn", "Booking.asgi:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["uvicorn", "Booking.asgi:app", "--host", "0.0.0.0", "--port", "80"]

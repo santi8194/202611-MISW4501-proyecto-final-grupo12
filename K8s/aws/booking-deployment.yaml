@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: booking
-        image: 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.0
+        image: 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.2
         ports:
-        - containerPort: 5000
+        - containerPort: 80
