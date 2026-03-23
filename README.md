@@ -84,14 +84,22 @@ docker tag booking:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-
 Push
 docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
 
+# Imagen Notification
+Img:
+docker build -t notification:1.0.0 ./src/Notification
+Tag:
+docker tag notification:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
+Push
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/container-registry-dev:1.0.0
+
 # Coenctar desde kubectl
 
 aws eks update-kubeconfig --region us-east-1 --name grupo12-travelhub-eks
 
 
 ## Desplegar Booking
-kubectl apply -f ./src/ks8/aws/booking-deployment.yaml
-kubectl apply -f ./src/ks8/aws/booking-service.yaml
+kubectl apply -f ./src/k8s/aws/booking-deployment.yaml
+kubectl apply -f ./src/k8s/aws/booking-service.yaml
 
 
 # Vuelve a loguear

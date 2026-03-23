@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification
+  template:
+    metadata:
+      labels:
+        app: notification
+    spec:
+      containers:
+        - name: notification
+          image: 962273458546.dkr.ecr.us-east-1.amazonaws.com/notification:1.0.5
+          ports:
+            - containerPort: 80
+          env:
+            - name: ENABLE_RABBIT
+              value: "false"
