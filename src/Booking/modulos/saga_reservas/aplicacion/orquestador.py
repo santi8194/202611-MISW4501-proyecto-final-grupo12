@@ -1,12 +1,17 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from Booking.modulos.saga_reservas.dominio.entidades import SagaInstance
 from Booking.modulos.saga_reservas.dominio.objetos_valor import EstadoSaga, TipoMensajeSaga
 from Booking.modulos.saga_reservas.infraestructura.repositorios import RepositorioSagas
 from Booking.config.uow import UnidadTrabajoHibrida
-from Booking.modulos.saga_reservas.dominio.eventos import (
-    ProcesarPagoCmd, ConfirmarReservaPmsCmd, 
-    CancelarReservaPmsCmd, ReversarPagoCmd, CancelarReservaLocalCmd,
+from Booking.modulos.saga_reservas.dominio.comandos import (
+    ProcesarPagoCmd, ConfirmarReservaPmsCmd,
+    CancelarReservaPmsCmd, ReversarPagoCmd,
     SolicitarAprobacionManualCmd, MarcarSagaEsperandoVoucherCmd
 )
+from Booking.modulos.reserva.aplicacion.comandos import CancelarReservaLocalCmd
 import uuid
 import inspect
 
@@ -22,9 +27,33 @@ DIR_COMANDOS = {
 }
 
 class OrquestadorSagaReservas:
-    def __init__(self, repositorio: RepositorioSagas, uow: UnidadTrabajoHibrida):
+    def __init__(self, repositorio: RepositorioSagas, uow: UnidadTrabajoHibrida,
+                 handler_confirmar_local=None, handler_cancelar_local=None):
         self.repositorio = repositorio
         self.uow = uow
+        # Handlers locales inyectados para evitar construcción inline de objetos de otro Bounded Context
+        self._handler_confirmar_local = handler_confirmar_local
+        self._handler_cancelar_local = handler_cancelar_local
+
+    def _get_handler_confirmar_local(self):
+        """Lazy-init: crea el handler de confirmación local si no fue inyectado externamente."""
+        if not self._handler_confirmar_local:
+            from Booking.modulos.reserva.aplicacion.handlers import ConfirmarReservaLocalHandler
+            from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
+            self._handler_confirmar_local = ConfirmarReservaLocalHandler(
+                repositorio=RepositorioReservas(), uow=self.uow
+            )
+        return self._handler_confirmar_local
+
+    def _get_handler_cancelar_local(self):
+        """Lazy-init: crea el handler de cancelación local si no fue inyectado externamente."""
+        if not self._handler_cancelar_local:
+            from Booking.modulos.reserva.aplicacion.handlers import CancelarReservaLocalHandler
+            from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
+            self._handler_cancelar_local = CancelarReservaLocalHandler(
+                repositorio=RepositorioReservas(), uow=self.uow
+            )
+        return self._handler_cancelar_local
 
     def _obtener_paso_actual(self, id_flujo: str, version: int, evento_disparador: str):
         pasos = self.repositorio.obtener_pasos_saga(id_flujo, version)
@@ -58,47 +87,32 @@ class OrquestadorSagaReservas:
         
         if comando_nombre == "ConfirmarReservaLocalCmd":
             saga.registrar_comando_emitido(comando_nombre, payload_registro)
-            print(f"[Orquestador] Interceptando Comando Local: {comando_nombre}. Procesando en memoria.")
-            
-            from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
-            from Booking.config.db import db
-            
-            repo_reservas = RepositorioReservas()
-            reserva = repo_reservas.obtener_por_id(str(id_reserva))
-            
-            if reserva:
-                from Booking.modulos.reserva.dominio.eventos import ReservaConfirmadaEvt
-                from datetime import datetime
-                
-                reserva.confirmar_reserva()
-                reserva.eventos.clear()
-                evento_local = ReservaConfirmadaEvt(id_reserva=reserva.id, fecha_actualizacion=datetime.now())
-                reserva.agregar_evento(evento_local)
-                
-                repo_reservas.actualizar(reserva)
-                self.uow.agregar_eventos(reserva.eventos)
-                
-                print(f"✅ [ORQUESTADOR -> LOCAL] Reserva {reserva.id} CONFIRMADA localmente en BD.")
-                
-                # Avanzamos al siguiente paso informando que ya lo hicimos
+            logger.info(f"[Orquestador] Delegando Comando Local: {comando_nombre} al handler inyectado.")
+
+            from Booking.modulos.reserva.aplicacion.comandos import ConfirmarReservaLocalCmd
+            evento_confirmado = self._get_handler_confirmar_local().handle(
+                ConfirmarReservaLocalCmd(id_reserva=id_reserva)
+            )
+
+            if evento_confirmado:
+                logger.info(f"✅ [ORQUESTADOR -> LOCAL] Reserva {id_reserva} CONFIRMADA localmente en BD.")
                 saga.avanzar_paso(siguiente_paso.index, "ReservaConfirmadaEvt", {"id_reserva": str(id_reserva)})
-                
-                # Revisar si la saga completó el happy path local e instigarlo a continuar
+
                 paso_final = next((p for p in pasos if p.index == siguiente_paso.index + 1), None)
                 if paso_final:
-                     saga.estado_global = EstadoSaga.EN_PROCESO
-                     self._procesar_siguiente_comando(
-                         saga=saga,
-                         pasos=pasos,
-                         siguiente_paso=paso_final,
-                         id_reserva=id_reserva,
-                         kwargs_comando={},
-                         payload_registro={}
-                     )
+                    saga.estado_global = EstadoSaga.EN_PROCESO
+                    self._procesar_siguiente_comando(
+                        saga=saga,
+                        pasos=pasos,
+                        siguiente_paso=paso_final,
+                        id_reserva=id_reserva,
+                        kwargs_comando={},
+                        payload_registro={}
+                    )
                 else:
                     saga.estado_global = EstadoSaga.COMPLETADA
             else:
-                print(f"❌ [ORQUESTADOR -> LOCAL] No se encontró la reserva {id_reserva} para confirmar.")
+                logger.info(f"❌ [ORQUESTADOR -> LOCAL] No se encontró la reserva {id_reserva} para confirmar.")
         else:
             ComandoClase = DIR_COMANDOS.get(comando_nombre)
             if ComandoClase:
@@ -142,7 +156,7 @@ class OrquestadorSagaReservas:
                     
                     if not fecha_ctx:
                          # Fallback temporal con advertencia en logs
-                         print(f"⚠️ [Orquestador] ADVERTENCIA: No se encontró 'fecha_reserva' en ninguna parte de la historia para {comando_nombre}.")
+                         logger.info(f"⚠️ [Orquestador] ADVERTENCIA: No se encontró 'fecha_reserva' en ninguna parte de la historia para {comando_nombre}.")
                          fecha_ctx = "2026-03-14"
                     
                     kwargs_filtrados['fecha_reserva'] = fecha_ctx
@@ -162,7 +176,7 @@ class OrquestadorSagaReservas:
                     
                 cmd = ComandoClase(id_reserva=id_reserva, **kwargs_filtrados)
                 self.uow.agregar_eventos([cmd])
-                print(f"[Orquestador] Comando Externo {comando_nombre} emitido para reserva {id_reserva}")
+                logger.info(f"[Orquestador] Comando Externo {comando_nombre} emitido para reserva {id_reserva}")
                 self.uow.commit()
 
     def iniciar_saga(self, id_reserva: uuid.UUID, id_usuario: uuid.UUID, monto: float, id_habitacion: uuid.UUID = None, fecha_reserva: str = None):
@@ -171,7 +185,7 @@ class OrquestadorSagaReservas:
             with self.uow:
                 definicion = self.repositorio.obtener_definicion_saga_activa("RESERVA_ESTANDAR")
                 if not definicion:
-                    print("[Orquestador] No se encontró definición de saga activa para RESERVA_ESTANDAR")
+                    logger.info("[Orquestador] No se encontró definición de saga activa para RESERVA_ESTANDAR")
                     return
 
                 saga = SagaInstance(
@@ -184,7 +198,7 @@ class OrquestadorSagaReservas:
                 # Buscamos el paso inicial (Index 0 del array, que corresponde a index=1 de la Saga).
                 pasos = self.repositorio.obtener_pasos_saga(saga.id_flujo, saga.version_ejecucion)
                 if not pasos or len(pasos) < 1:
-                    print(f"[Orquestador] No hay pasos definidos")
+                    logger.info(f"[Orquestador] No hay pasos definidos")
                     return
                 
                 paso_inicial = pasos[0]
@@ -220,7 +234,7 @@ class OrquestadorSagaReservas:
         except Exception as e:
             import traceback
             traceback.print_exc()
-            print(f"[Orquestador] Error crítico en iniciar_saga: {e}")
+            logger.info(f"[Orquestador] Error crítico en iniciar_saga: {e}")
             return False
 
     def manejar_evento_respuesta(self, id_reserva: uuid.UUID, evento_recibido: str, payload_recibido: dict = None):
@@ -235,20 +249,20 @@ class OrquestadorSagaReservas:
             # Validar idempotencia de eventos recibidos
             for log in saga.historial:
                 if log.tipo_mensaje == TipoMensajeSaga.EVENTO_RECIBIDO and log.accion == evento_recibido:
-                    print(f"[Orquestador Agnostico] ♻️ Evento ya procesado (Idempotencia). Ignorando: {evento_recibido}")
+                    logger.info(f"[Orquestador Agnostico] ♻️ Evento ya procesado (Idempotencia). Ignorando: {evento_recibido}")
                     return
 
             # Validar primero si el evento entrante es un error reportado (Fallo orgánico)
             paso_fallido = self._obtener_paso_por_error(saga.id_flujo, saga.version_ejecucion, evento_recibido)
             if paso_fallido:
-                print(f"[Orquestador Agnostico] 🚨 Evento de error detectado: {evento_recibido}. Desviando a compensación.")
+                logger.info(f"[Orquestador Agnostico] 🚨 Evento de error detectado: {evento_recibido}. Desviando a compensación.")
                 self.compensar_saga(id_reserva, evento_recibido, payload_recibido)
                 return
 
             # Buscar en el routing slip (base de datos) qué paso produjo este evento como ÉXITO
             paso_actual = self._obtener_paso_actual(saga.id_flujo, saga.version_ejecucion, evento_recibido)
             if not paso_actual:
-                print(f"[Orquestador Agnostico] Evento no reconocido o fuera de secuencia: {evento_recibido}")
+                logger.info(f"[Orquestador Agnostico] Evento no reconocido o fuera de secuencia: {evento_recibido}")
                 return
 
             # Marcamos que cerramos exitosamente el paso actual
@@ -288,17 +302,17 @@ class OrquestadorSagaReservas:
             
             # Idempotencia: Si ya está compensando o finalizó, no hacer nada
             if not saga or saga.estado_global in [EstadoSaga.COMPENSANDO, EstadoSaga.COMPLETADA, EstadoSaga.COMPENSACION_EXITOSA]:
-                print(f"[Orquestador-Fallo] ♻️ Compensación ya manejada o en estado final. Ignorando evento: {evento_fallo}")
+                logger.info(f"[Orquestador-Fallo] ♻️ Compensación ya manejada o en estado final. Ignorando evento: {evento_fallo}")
                 return
 
-            print(f"\n[ORQUESTADOR-FALLO] Iniciando compensación para reserva {id_reserva}. Evento fallo reportado: {evento_fallo}")
+            logger.info(f"\n[ORQUESTADOR-FALLO] Iniciando compensación para reserva {id_reserva}. Evento fallo reportado: {evento_fallo}")
             saga.iniciar_compensacion(evento_fallo, payload_original=payload_fallo)
             comandos_compensatorios = []
             
             # Buscar si el evento_fallo coincide con un 'error' esperado en la definición
             paso_fallido = self._obtener_paso_por_error(saga.id_flujo, saga.version_ejecucion, evento_fallo)
             if paso_fallido:
-                print(f"[Orquestador] El error '{evento_fallo}' corresponde al fallo del paso {paso_fallido.index} detonado por ({paso_fallido.evento})")
+                logger.info(f"[Orquestador] El error '{evento_fallo}' corresponde al fallo del paso {paso_fallido.index} detonado por ({paso_fallido.evento})")
 
             # -------------------------------------------------------------
             # LIFO BASADO EN LA TABLA DE DEFINICIÓN DE EVENTOS
@@ -320,7 +334,7 @@ class OrquestadorSagaReservas:
 
                     ClaseCompensacion = DIR_COMANDOS.get(paso.compensacion)
                     if ClaseCompensacion:
-                        print(f" -> LIFO Reversando: {evento_recibido} ... al emitir {ClaseCompensacion.__name__}")
+                        logger.info(f" -> LIFO Reversando: {evento_recibido} ... al emitir {ClaseCompensacion.__name__}")
                         
                         kwargs_log = {"id_reserva": str(id_reserva)}
                         
@@ -343,16 +357,10 @@ class OrquestadorSagaReservas:
                             comandos_compensatorios.append(cmd)
                             kwargs_log["id_habitacion"] = str(habitacion)
                         elif ClaseCompensacion == CancelarReservaLocalCmd:
-                            print(f"[Orquestador-Fallo] Interceptando Comando Local para Compensación: CancelarReservaLocalCmd")
-                            from Booking.modulos.reserva.aplicacion.handlers import CancelarReservaLocalHandler
-                            from Booking.modulos.reserva.infraestructura.repositorios import RepositorioReservas
-                            
-                            handler_local_fallo = CancelarReservaLocalHandler(
-                                repositorio=RepositorioReservas(), 
-                                uow=self.uow
+                            logger.info(f"[Orquestador-Fallo] Delegando compensación local al handler inyectado: CancelarReservaLocalCmd")
+                            self._get_handler_cancelar_local().handle(
+                                CancelarReservaLocalCmd(id_reserva=id_reserva)
                             )
-                            # Ejecuta el borrado local sincrónicamente:
-                            evento_falla = handler_local_fallo.handle(CancelarReservaLocalCmd(id_reserva=id_reserva))
                         
                         saga.registrar_comando_emitido(ClaseCompensacion.__name__, kwargs_log)
 
@@ -361,4 +369,4 @@ class OrquestadorSagaReservas:
             self.uow.agregar_eventos(comandos_compensatorios)
             self.repositorio.actualizar(saga)
             self.uow.commit()
-            print(f"[ORQUESTADOR-FALLO] Compensación FINALIZADA OK para la reserva {id_reserva}\n")
+            logger.info(f"[ORQUESTADOR-FALLO] Compensación FINALIZADA OK para la reserva {id_reserva}\n")

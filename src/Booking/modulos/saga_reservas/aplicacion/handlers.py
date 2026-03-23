@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from Booking.seedwork.aplicacion.comandos import Handler
 from Booking.modulos.reserva.dominio.eventos import ReservaPendiente
 from Booking.modulos.saga_reservas.dominio.eventos import PagoExitosoEvt, ConfirmacionPmsExitosaEvt, RechazarReservaCmd
@@ -12,7 +16,7 @@ class IniciarSagaHandler(Handler):
         self.orquestador = orquestador
 
     def handle(self, evento: ReservaPendiente):
-        print(f"\n[EVENTO RECIBIDO] ReservaPendiente detectada para: {evento.id_reserva}")
+        logger.info(f"\n[EVENTO RECIBIDO] ReservaPendiente detectada para: {evento.id_reserva}")
         self.orquestador.iniciar_saga(
             id_reserva=evento.id_reserva,
             id_usuario=evento.id_usuario,
@@ -32,11 +36,11 @@ class RespuestaSagaHandler(Handler):
     def handle(self, evento):
         # En una app real, el evento hereda de una clase base p.ej EventoIntegracion con id_reserva
         if not hasattr(evento, 'id_reserva'):
-            print("[RespuestaSagaHandler] Evento ignorado: No tiene id_reserva")
+            logger.info("[RespuestaSagaHandler] Evento ignorado: No tiene id_reserva")
             return
             
         nombre_evento = evento.__class__.__name__
-        print(f"\n[EVENTO RECIBIDO AGNOSTICO] {nombre_evento} detectado para: {evento.id_reserva}")
+        logger.info(f"\n[EVENTO RECIBIDO AGNOSTICO] {nombre_evento} detectado para: {evento.id_reserva}")
         
         # Convertimos el evento a diccionario para pasarlo como payload dinámico
         payload = vars(evento).copy()
@@ -62,7 +66,7 @@ class CompensarSagaHandler(Handler):
         self.orquestador = orquestador
 
     def handle(self, comando: RechazarReservaCmd):
-        print(f"\n[COMANDO RECIBIDO] RechazarReservaCmd detectado provocando un FALLO MASIVO LIFO.")
+        logger.info(f"\n[COMANDO RECIBIDO] RechazarReservaCmd detectado provocando un FALLO MASIVO LIFO.")
         self.orquestador.compensar_saga(
             id_reserva=comando.id_reserva,
             evento_fallo="RechazarReservaManualCmd"

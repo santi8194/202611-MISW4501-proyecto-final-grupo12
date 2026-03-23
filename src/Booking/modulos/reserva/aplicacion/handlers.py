@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from Booking.seedwork.aplicacion.comandos import Handler
 from Booking.modulos.reserva.aplicacion.comandos import (
     CrearReservaHold, FormalizarReserva, 
@@ -32,7 +36,7 @@ class CrearReservaHoldHandler(Handler):
             
             # Trigger UoW Híbrida (Salva en BD -> Publica eventos a RabbitMQ)
             self.uow.commit() 
-            print(f"Reserva_Hold persistida y evento despachado: {reserva.id}")
+            logger.info(f"Reserva_Hold persistida y evento despachado: {reserva.id}")
         return reserva.id
 
 class FormalizarReservaHandler(Handler):
@@ -53,7 +57,7 @@ class FormalizarReservaHandler(Handler):
             
             # La UoW inserta en BD y publica el ReservaPendienteEvt
             self.uow.commit() 
-            print(f"Reserva {reserva.id} formalizada (PENDIENTE) y evento despachado.")
+            logger.info(f"Reserva {reserva.id} formalizada (PENDIENTE) y evento despachado.")
         return True
 
 class ConfirmarReservaLocalHandler(Handler):
@@ -81,7 +85,7 @@ class ConfirmarReservaLocalHandler(Handler):
             self.uow.agregar_eventos(reserva.eventos)
             self.repositorio.actualizar(reserva)
             self.uow.commit() 
-            print(f"✅ [HANDLER LOCAL] Reserva {reserva.id} CONFIRMADA localmente.")
+            logger.info(f"✅ [HANDLER LOCAL] Reserva {reserva.id} CONFIRMADA localmente.")
         return evento_local
 
 class CancelarReservaLocalHandler(Handler):
@@ -108,5 +112,5 @@ class CancelarReservaLocalHandler(Handler):
             self.uow.agregar_eventos(reserva.eventos)
             self.repositorio.actualizar(reserva)
             self.uow.commit() 
-            print(f"❌ [HANDLER LOCAL] Reserva {reserva.id} CANCELADA localmente por compensación.")
+            logger.info(f"❌ [HANDLER LOCAL] Reserva {reserva.id} CANCELADA localmente por compensación.")
         return evento_falla

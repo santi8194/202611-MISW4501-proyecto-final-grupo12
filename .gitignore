@@ -57,6 +57,15 @@ src/Booking/contents_summary.txt
 experimento/
 data/
 
+#Design
+plans/
+documents/
+
+#IDEs
+.windsurf/  
+.agents/ 
+
+
 # Terraform
 # **/.terraform/
 # *.tfstate

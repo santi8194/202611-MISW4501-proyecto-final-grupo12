@@ -25,11 +25,6 @@ class CancelarReservaPmsCmd(Comando):
 class ReversarPagoCmd(Comando):
     id_reserva: uuid.UUID
     monto: float
-    
-@dataclass
-class CancelarReservaLocalCmd(Comando):
-    id_reserva: uuid.UUID
-
 # --- EVENTOS: (Esperados de otros microservicios o internos) ---
 @dataclass
 class PagoExitosoEvt(EventoDominio):
