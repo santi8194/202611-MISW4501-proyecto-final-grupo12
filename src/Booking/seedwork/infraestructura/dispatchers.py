@@ -94,9 +94,11 @@ class DespachadorRabbitMQ(Despachador):
     def publicar_evento(self, evento, topico=""): 
         # El parámetro topico de la interfaz original ahora se ignora en pro del enrutamiento dinámico
         
-        # Hack para comandos que fueron pasados como eventos
+        from Booking.seedwork.aplicacion.comandos import Comando
         tipo = getattr(evento, '__class__').__name__
-        if "Cmd" in tipo or "EsperandoVoucher" in tipo:
+        
+        # Check para comandos que fueron pasados como eventos
+        if isinstance(evento, Comando):
             exchange, routing_key = self._obtener_routing(tipo)
             
             import uuid
