@@ -102,9 +102,17 @@ docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/payment:1.0.4
 
 # Imagen pmsintegration
 Repo: aws ecr create-repository --repository-name pmsintegration
-docker build -t pmsintegration:1.0.0 ./src/PMSintegration
-docker tag pmsintegration:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/pmsintegration:1.0.0
-docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/pmsintegration:1.0.0
+docker build -t pmsintegration:1.0.4 ./src/PMSintegration
+docker tag pmsintegration:1.0.4 962273458546.dkr.ecr.us-east-1.amazonaws.com/pmsintegration:1.0.4
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/pmsintegration:1.0.4
+
+
+# Imagen PartnerManagement
+Repo: aws ecr create-repository --repository-name partnermanagement
+docker build --no-cache -t partnermanagement:1.0.1 ./src/PartnerManagement
+docker tag partnermanagement:1.0.1 962273458546.dkr.ecr.us-east-1.amazonaws.com/partnermanagement:1.0.1
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/partnermanagement:1.0.1
+
 
 
 # Coenctar y Actualizar kubeconfig
@@ -124,6 +132,17 @@ kubectl apply -f ./k8s/aws/notification-service.yaml
 ## Desplegar payment
 kubectl apply -f ./k8s/aws/payment-deployment.yaml
 kubectl apply -f ./k8s/aws/payment-service.yaml
+
+## Desplegar pmsintegration
+kubectl apply -f ./k8s/aws/pmsintegration-deployment.yaml
+kubectl apply -f ./k8s/aws/pmsintegration-service.yaml
+kubectl rollout restart deployment pmsintegration-deployment
+
+
+## Desplegar PartnerManagement
+
+kubectl apply -f ./k8s/aws/partnermanagement-deployment.yaml
+kubectl apply -f ./k8s/aws/partnermanagement-service.yaml
 
 # Vuelve a loguear
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 962273458546.dkr.ecr.us-east-1.amazonaws.com

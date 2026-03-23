@@ -12,7 +12,7 @@ def create_app():
     # Endpoint de verificación de salud (health check). Muy util en Docker/Kubernetes.
     @app.get("/health")
     def health_check():
-        return {"status": "ok"}
+        return {"status": "PartnerManagement Service running"}
 
     # Evento que se ejecuta automáticamente cuando FastAPI termina de iniciar
     @app.on_event("startup")
