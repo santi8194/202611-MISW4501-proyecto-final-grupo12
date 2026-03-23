@@ -46,14 +46,14 @@ def procesar_mensaje(ch, method, properties, body):
         logger.info(f"\n[SAGA WORKER] Mensaje Recibido: {method.routing_key}")
         
         from Booking.api import create_app
-        logger.info("[SAGA WORKER] Creando Flask App en memoria...", flush=True)
+        logger.info("[SAGA WORKER] Creando Flask App en memoria...")
         app = create_app()
         
         with app.app_context():
-            logger.info("[SAGA WORKER] Entró al app context", flush=True)
+            logger.info("[SAGA WORKER] Entró al app context")
             repo_sagas = RepositorioSagas() # Usa db.session por defecto
             uow = UnidadTrabajoHibrida()
-            logger.info("[SAGA WORKER] UoW inicializado", flush=True)
+            logger.info("[SAGA WORKER] UoW inicializado")
             orquestador = OrquestadorSagaReservas(repositorio=repo_sagas, uow=uow)
 
             # Validar tipo de evento esperado (por convención o por key)
@@ -74,7 +74,7 @@ def procesar_mensaje(ch, method, properties, body):
 
                 logger.info(f"[SAGA WORKER] Iniciando Saga para reserva: {id_reserva} (Fecha: {fecha_reserva})")
                      
-                logger.info(f"[SAGA WORKER] Llamando orquestador con id_reserva: {id_reserva}", flush=True)
+                logger.info(f"[SAGA WORKER] Llamando orquestador con id_reserva: {id_reserva}")
                 res = orquestador.iniciar_saga(
                     id_reserva=uuid.UUID(str(id_reserva)),
                     id_usuario=uuid.UUID(str(id_usuario)),
@@ -82,7 +82,7 @@ def procesar_mensaje(ch, method, properties, body):
                     id_habitacion=uuid.UUID(str(id_habitacion)) if id_habitacion else None,
                     fecha_reserva=fecha_reserva
                 )
-                logger.info(f"[SAGA WORKER] Orquestador terminó con resultado: {res}", flush=True)
+                logger.info(f"[SAGA WORKER] Orquestador terminó con resultado: {res}")
                      
             else:
                 # Es un evento de respuesta de otro microservicio
@@ -109,7 +109,7 @@ def procesar_mensaje(ch, method, properties, body):
         logger.info("[SAGA WORKER] Mensaje procesado y Acknowledge enviado.")
         
     except Exception as e:
-        logger.info(f"[SAGA WORKER] Error procesando mensaje {method.routing_key}: {e}")
+        logger.error(f"[SAGA WORKER] Error procesando mensaje {method.routing_key}: {e}")
         # Rechazamos el mensaje sin requeue en caso de error fatal de sintaxis
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
@@ -128,12 +128,12 @@ def iniciar_consumidor():
              connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_host, port=rabbitmq_port))
              break
          except pika.exceptions.AMQPConnectionError:
-             logger.info(f"[SAGA WORKER] RabbitMQ no disponible ({rabbitmq_host}:{rabbitmq_port}), reintentando...")
+             logger.warning(f"[SAGA WORKER] RabbitMQ no disponible ({rabbitmq_host}:{rabbitmq_port}), reintentando...")
              retries -= 1
              time.sleep(3)
 
     if not connection:
-         logger.info("[SAGA WORKER] Fatal: No se pudo conectar a RabbitMQ.")
+         logger.critical("[SAGA WORKER] Fatal: No se pudo conectar a RabbitMQ.")
          sys.exit(1)
 
     channel = connection.channel()
@@ -161,7 +161,7 @@ def iniciar_consumidor():
     # Suscribirse
     channel.basic_consume(queue=queue_name, on_message_callback=procesar_mensaje)
 
-    logger.info(f" [*] SAGA WORKER esperando eventos ('{routing_key}') en la cola '{queue_name}'. Para salir presione CTRL+C", flush=True)
+    logger.info(f" [*] SAGA WORKER esperando eventos ('{routing_key}') en la cola '{queue_name}'. Para salir presione CTRL+C")
     channel.start_consuming()
 
 if __name__ == '__main__':
@@ -170,4 +170,4 @@ if __name__ == '__main__':
         sys.stdout.reconfigure(line_buffering=True)
         iniciar_consumidor()
     except KeyboardInterrupt:
-        logger.info('Worker detenido manualmente.', flush=True)
+        logger.info('Worker detenido manualmente.')
