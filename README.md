@@ -79,16 +79,16 @@ terraform -chdir="$PWD\terraform\stacks\eks" destroy -var-file="$PWD\terraform\e
 # Imagen Booking
 Repo: aws ecr create-repository --repository-name booking
 Img:
-docker build -t booking:1.0.0 ./src/Booking
+docker build --no-cache -t booking:1.0.2 ./src/Booking
 Tag:
-docker tag booking:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.0
+docker tag booking:1.0.2 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.2
 Push
-docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.0
+docker push 962273458546.dkr.ecr.us-east-1.amazonaws.com/booking:1.0.2
 
 # Imagen Notification
 Repo: aws ecr create-repository --repository-name notification
 Img:
-docker build -t notification:1.0.0 ./src/Notification
+docker build --no-cache -t notification:1.0.0 ./src/Notification
 Tag:
 docker tag notification:1.0.0 962273458546.dkr.ecr.us-east-1.amazonaws.com/notification:1.0.0
 Push
@@ -123,6 +123,7 @@ aws eks update-kubeconfig --region us-east-1 --name grupo12-travelhub-eks
 ## Desplegar Booking
 kubectl apply -f ./k8s/aws/booking-deployment.yaml
 kubectl apply -f ./k8s/aws/booking-service.yaml
+kubectl rollout restart deployment booking-deployment
 
 ## Desplegar Notification
 kubectl apply -f ./k8s/aws/notification-deployment.yaml
@@ -152,10 +153,12 @@ aws ecr get-login-password --region us-east-1 | docker login --username AWS --pa
 # Ingress
 Se configuró un Ingress Controller (NGINX) en el cluster EKS para exponer todos los microservicios mediante una sola URL pública.
 
-kubectl apply -f ./src/k8s/aws/ingress.yaml
-kubectl get ingress
+kubectl apply -f ./k8s/aws/ingress.yaml
+kubectl get svc -n ingress-nginx ingress-nginx-controller -w
 
 URL: http://a27afd6e0e6414ee490e57d925fab93e-408326643.us-east-1.elb.amazonaws.com
+
+kubectl get pods -n ingress-nginx
 
 Probar:
 /pmsintegration/health
